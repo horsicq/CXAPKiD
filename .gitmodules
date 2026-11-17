@@ -1,0 +1,9 @@
+[submodule "dep/xxfclib"]
+	path = dep/xxfclib
+	url = https://github.com/horsicq/xxfclib.git
+[submodule "dep/xxyara"]
+	path = dep/xxyara
+	url = https://github.com/horsicq/xxyara.git
+[submodule "dep/APKiD"]
+	path = dep/APKiD
+	url = https://github.com/rednaga/APKiD.git
