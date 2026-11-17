@@ -4,6 +4,9 @@ A C port of [APKiD 3.2.0](https://github.com/rednaga/APKiD) by RedNaga.
 Detects compilers, packers, obfuscators, protectors and trackers in Android
 files using APKiD's rules and [xxyara](https://github.com/horsicq/xxyara).
 
+[CI builds](https://github.com/horsicq/CXAPKiD/actions/workflows/build.yml) test
+Linux and Windows x64 packages; download the latest [Beta](https://github.com/horsicq/CXAPKiD/releases/tag/Beta).
+
 ## Build
 
 Requires CMake 3.21 or newer and a C11 compiler. Dependencies are Git submodules.
