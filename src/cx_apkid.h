@@ -75,10 +75,19 @@ typedef struct cx_string_match {
     size_t length;
 } cx_string_match;
 
+/* What a rule's meta "description" is in yara-python: str, int or bool. */
+typedef enum cx_description_kind {
+    CX_DESCRIPTION_TEXT,
+    CX_DESCRIPTION_INTEGER,
+    CX_DESCRIPTION_BOOLEAN
+} cx_description_kind;
+
 typedef struct cx_match {
     size_t ns;         /* the rule's namespace, in declaration order */
     char *rule;
-    char *description; /* meta "description", NULL when absent */
+    char *description; /* meta "description" as text (str() of it), NULL when absent */
+    cx_description_kind description_kind;
+    int64_t description_number; /* the value of an integer or boolean description */
     char **tags;       /* sorted */
     size_t tag_count;
     cx_string_match *strings;
@@ -134,6 +143,9 @@ void cx_scanner_free(cx_scanner *scanner);
 /* Scanner.scan(path) for every input: files, or every file of a directory.
  * Output is the same as scanning them one after another. */
 void cx_scanner_scan_inputs(cx_scanner *scanner, const char *const *paths, size_t count);
+
+/* json.dumps(text): a JSON string, everything outside ASCII escaped. */
+void cx_json_string(cx_buf *out, const char *text);
 
 void cx_output_init(cx_output *output, const cx_options *options, const char *rules_sha256);
 /* Restores the console after colored output (pairs with cx_output_init). */

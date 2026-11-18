@@ -39,6 +39,11 @@ EDITS = {
          "    false\n", 1),
     ],
     "dex/obfuscators.yara": [
+        ("    $a_inner_unicode = /Lo\\/([\\u0000-\\u007F]{1,4}|[^\\u0000-\\u007F]{1,4})\\$[^\\u0000-\\u007F]{1,4};\\x00/\n",
+         LEGACY_NOTE + "YARA 3.11 has no \\u escape: it reads [\\u0000-\\u007F] as the bytes\n"
+         "    // 0x30-0x75 ('u', '0', the range '0'-'u', '0', '0', '7', 'F'). YARA-X would read\n"
+         "    // the ASCII range, so the classes are spelled as YARA 3.11 matches them.\n"
+         "    $a_inner_unicode = /Lo\\/([\\x30-\\x75]{1,4}|[^\\x30-\\x75]{1,4})\\$[^\\x30-\\x75]{1,4};\\x00/\n", 1),
         ("    for 3 i in (0..dex.header.field_ids_size) : (dex.field[i].name matches /[^\\x00-\\x7F]{1,4}/)\n",
          LEGACY_NOTE + "dex.field[] (fields defined in class data) has no YARA-X\n"
          "    // counterpart; CXAPKiD counts these names as YARA 3.11 sees them (cx_dex.c).\n"

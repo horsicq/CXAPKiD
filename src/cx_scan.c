@@ -151,18 +151,28 @@ static void cx_on_metadata(const YRX_METADATA *metadata, void *user_data)
 {
     cx_match *match = (cx_match *)user_data;
     if (strcmp(metadata->identifier, "description") != 0) return;
+    /* The last "description" of a rule counts, as in yara-python's dict. */
     free(match->description);
     match->description = NULL;
-    if (metadata->value_type == YRX_STRING)
+    match->description_kind = CX_DESCRIPTION_TEXT;
+    match->description_number = 0;
+    if (metadata->value_type == YRX_STRING) {
         match->description = cx_strdup(metadata->value.string);
-    else if (metadata->value_type == YRX_BYTES)
+    } else if (metadata->value_type == YRX_BYTES) {
         match->description = cx_strndup((const char *)metadata->value.bytes.data, metadata->value.bytes.length);
-    else if (metadata->value_type == YRX_I64)
-        match->description = cx_format("%lld", (long long)metadata->value.i64);
-    else if (metadata->value_type == YRX_F64)
+    } else if (metadata->value_type == YRX_I64) {
+        /* yara-python 3.11 hands an integer over as a C int: APKiD sees the
+           low 32 bits of the value. */
+        match->description_kind = CX_DESCRIPTION_INTEGER;
+        match->description_number = (int64_t)(int32_t)(uint32_t)(uint64_t)metadata->value.i64;
+        match->description = cx_format("%lld", (long long)match->description_number);
+    } else if (metadata->value_type == YRX_F64) {
         match->description = cx_format("%g", metadata->value.f64);
-    else if (metadata->value_type == YRX_BOOLEAN)
+    } else if (metadata->value_type == YRX_BOOLEAN) {
+        match->description_kind = CX_DESCRIPTION_BOOLEAN;
+        match->description_number = metadata->value.boolean ? 1 : 0;
         match->description = cx_strdup(metadata->value.boolean ? "True" : "False");
+    }
 }
 
 static void cx_on_pattern_match(const YRX_MATCH *found, void *user_data)
@@ -435,12 +445,16 @@ static void cx_record_namespaces(cx_scanner *scanner, const cx_match_list *match
     cx_log_record(scanner->log, record);
 }
 
+/* A full copy. (Its only user prints the --print-matches lines, which show
+ * no description: no output depends on the three description fields here.) */
 static void cx_match_copy(cx_match *to, const cx_match *from)
 {
     memset(to, 0, sizeof(*to));
     to->ns = from->ns;
     to->rule = cx_strdup(from->rule);
     to->description = from->description ? cx_strdup(from->description) : NULL;
+    to->description_kind = from->description_kind;
+    to->description_number = from->description_number;
     to->tag_count = from->tag_count;
     to->tags = (char **)cx_malloc((from->tag_count ? from->tag_count : 1) * sizeof(char *));
     for (size_t t = 0; t < from->tag_count; ++t) to->tags[t] = cx_strdup(from->tags[t]);
@@ -508,6 +522,14 @@ static void cx_report_entry(cx_scanner *scanner, const xx_zip_py_info *info, con
     free(what);
 }
 
+/* The UserWarnings zipfile.ZipFile() emitted for the archive. */
+static void cx_report_warnings(cx_scanner *scanner, const xx_zip_py *zip)
+{
+    if (!scanner->options->verbose) return;
+    for (size_t i = 0; i < zip->warning_count; ++i)
+        cx_log_emit(scanner->log, 2, cx_format("UserWarning: %s\n", zip->warnings[i]));
+}
+
 static void cx_print_found(cx_scanner *scanner, const char *key, const cx_match_list *matches)
 {
     cx_buf text = {0};
@@ -534,8 +556,8 @@ static void cx_scan_zip(cx_scanner *scanner, const xx_zip_py *zip, int64_t depth
 /* A member job of a parallel run that may hand its nested archive's members
  * to other threads (see cx_pool_spawn). */
 typedef struct cx_spawn cx_spawn;
-static bool cx_pool_spawn(cx_spawn *spawn, const xx_zip_py_info *info, const char *prefix, uint8_t *data, size_t size,
-                          xx_zip_py_owner owner);
+static bool cx_pool_spawn(cx_scanner *scanner, cx_spawn *spawn, const xx_zip_py_info *info, const char *prefix, uint8_t *data,
+                          size_t size, xx_zip_py_owner owner);
 
 /* Scanner._scan_zip_entry(). With `spawn`, a member that is an archive to
  * scan may continue as jobs of the parallel run: then the rules over the
@@ -554,6 +576,15 @@ static void cx_scan_zip_entry(cx_scanner *scanner, const xx_zip_py *zip, const x
     xx_zip_py_status status = xx_zip_py_open_entry(zip, info, &data_offset, &warning, &error);
 
     if (status == XX_ZIP_PY_NO_MEMORY) cx_out_of_memory();
+    if (status == XX_ZIP_PY_VALUE_ERROR && depth == 0) {
+        /* A negative header offset: io.BytesIO raises ValueError, but APKiD
+           reads the outermost archive from a file, which raises
+           OSError(EINVAL). */
+        cx_report_entry(scanner, info, prefix, depth, "[Errno 22] Invalid argument");
+        xx_zip_py_free_text(warning);
+        xx_zip_py_free_text(error);
+        return;
+    }
     if (warning) {
         if (options->verbose) cx_log_emit(scanner->log, 2, cx_format("UserWarning: %s\n", warning));
         xx_zip_py_free_text(warning);
@@ -594,23 +625,21 @@ static void cx_scan_zip_entry(cx_scanner *scanner, const xx_zip_py *zip, const x
         xx_zip_py_free_text(error);
         return;
     } else {
-        if (options->typing == CX_TYPING_MAGIC) {
-            /* entry.read(4), then the magic test. ZipExtFile reads at least
-               MIN_READ_SIZE (4096) bytes, so a member that ends within them
-               is complete, and CRC checked, already at this point. */
-            status = xx_zip_py_read(zip, info, data_offset, 4096, &data, &size, &complete, &owner, &error);
-            if (status == XX_ZIP_PY_OK && !cx_should_scan(scanner, data, size, info->filename)) {
-                xx_zip_py_free(data, owner);
-                return;
-            }
-            if (status == XX_ZIP_PY_OK && !complete) {
-                xx_zip_py_free(data, owner);
-                data = NULL;
-                status = xx_zip_py_read(zip, info, data_offset, 0, &data, &size, &complete, &owner, &error);
-            }
-        } else {
-            if (!cx_should_scan(scanner, NULL, 0, info->filename)) return;
-            status = xx_zip_py_read(zip, info, data_offset, 0, &data, &size, &complete, &owner, &error);
+        /* entry.read(4), then the typing test (on those bytes or on the
+           name), then entry.read(). ZipExtFile takes at least MIN_READ_SIZE
+           (4096) bytes of the member's data for read(4): a member that ends
+           within them is complete, CRC checked and all here already at this
+           point; one that fails within them fails here, scanned or not,
+           whatever the typing. */
+        status = xx_zip_py_read(zip, info, data_offset, 4, &data, &size, &complete, &owner, &error);
+        if (status == XX_ZIP_PY_OK && !cx_should_scan(scanner, data, size < 4 ? size : 4, info->filename)) {
+            xx_zip_py_free(data, owner);
+            return;
+        }
+        if (status == XX_ZIP_PY_OK && !complete) {
+            xx_zip_py_free(data, owner);
+            data = NULL;
+            status = xx_zip_py_read_rest(zip, info, data_offset, 4, &data, &size, &owner, &error);
         }
         if (status == XX_ZIP_PY_OVERLAPPED) {
             xx_zip_py_free_text(error);
@@ -626,7 +655,7 @@ static void cx_scan_zip_entry(cx_scanner *scanner, const xx_zip_py *zip, const x
     /* The nested-archive test does not depend on the rules' outcome; it is
        only made earlier here. */
     if (spawn && depth < options->scan_depth && cx_is_zipfile(scanner, data, size, info->filename) &&
-        cx_pool_spawn(spawn, info, prefix, data, size, owner))
+        cx_pool_spawn(scanner, spawn, info, prefix, data, size, owner))
         return; /* the spawned jobs own data now */
 
     char *key = cx_format("%s!%s", prefix, info->filename);
@@ -650,6 +679,7 @@ static void cx_scan_zip_entry(cx_scanner *scanner, const xx_zip_py *zip, const x
             cx_report_entry(scanner, info, prefix, depth, error);
             xx_zip_py_free_text(error);
         } else {
+            cx_report_warnings(scanner, &nested);
             cx_scan_zip(scanner, &nested, depth + 1, key, results);
             xx_zip_py_close(&nested);
         }
@@ -806,8 +836,8 @@ static uint64_t cx_member_cost(const xx_zip_py_info *info)
 
 /* The member's data is an archive with members: continue as a group of jobs
  * (see above). False leaves everything to the caller, unchanged. */
-static bool cx_pool_spawn(cx_spawn *spawn, const xx_zip_py_info *info, const char *prefix, uint8_t *data, size_t size,
-                          xx_zip_py_owner owner)
+static bool cx_pool_spawn(cx_scanner *scanner, cx_spawn *spawn, const xx_zip_py_info *info, const char *prefix, uint8_t *data,
+                          size_t size, xx_zip_py_owner owner)
 {
     cx_pool *pool = spawn->pool;
     xx_zip_py nested;
@@ -821,6 +851,7 @@ static bool cx_pool_spawn(cx_spawn *spawn, const xx_zip_py_info *info, const cha
         xx_zip_py_close(&nested);
         return false;
     }
+    cx_report_warnings(scanner, &nested);
     cx_group *group = (cx_group *)cx_calloc(1, sizeof(*group));
     group->info = info;
     group->prefix = prefix;
@@ -1150,8 +1181,18 @@ static void cx_scan_file_obj(cx_scanner *scanner, const uint8_t *data, size_t si
     const char *file_name = cx_path_basename(file_path);
     char *error = NULL;
     if (!cx_should_scan(scanner, data, size, file_name)) return;
-    if (!cx_is_zipfile(scanner, data, size, file_name)) {
+    /* APKiD reads this archive from a file, where zipfile gives up on a
+       seek that io.BytesIO (and so xx_zip_py) lets pass: is_zipfile() is
+       False then, and ZipFile() raises. */
+    bool unseekable = xx_zip_py_file_seek_fails(data, size);
+    if (!cx_is_zipfile(scanner, data, size, file_name) ||
+        (unseekable && scanner->options->typing != CX_TYPING_FILENAME)) {
         cx_scan_whole(scanner, data, size, file_path, results);
+        return;
+    }
+    if (unseekable) {
+        cx_scan_whole(scanner, data, size, file_path, results);
+        cx_report(scanner, file_path, "File is not a zip file");
         return;
     }
     /* The archive is opened before the whole-file scan, which does not
@@ -1165,6 +1206,7 @@ static void cx_scan_file_obj(cx_scanner *scanner, const uint8_t *data, size_t si
         xx_zip_py_free_text(error);
         return;
     }
+    cx_report_warnings(scanner, &zip);
     size_t members = 0;
     for (size_t i = 0; i < zip.count; ++i)
         if (!xx_zip_py_info_is_dir(&zip.infos[i])) ++members;

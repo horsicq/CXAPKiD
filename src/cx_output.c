@@ -151,7 +151,7 @@ void cx_output_finish(cx_output *output)
 
 typedef struct cx_group {
     char *tags; /* ', '.join(sorted(m.tags)) */
-    const char **descriptions;
+    const cx_match **descriptions; /* the matches whose description is listed */
     size_t count;
 } cx_group;
 
@@ -167,6 +167,34 @@ static bool cx_has_tag(const cx_match *match, const char *tag)
     return false;
 }
 
+/* A rule without a description shows its name. */
+static const char *cx_description_text(const cx_match *match)
+{
+    return match->description ? match->description : match->rule;
+}
+
+/* `description not in results[tags]`, Python's ==: text equals text, and a
+ * number equals a number of the same value, True being 1 and False 0. */
+static bool cx_same_description(const cx_match *a, const cx_match *b)
+{
+    bool a_number = a->description && a->description_kind != CX_DESCRIPTION_TEXT;
+    bool b_number = b->description && b->description_kind != CX_DESCRIPTION_TEXT;
+    if (a_number != b_number) return false;
+    if (a_number) return a->description_number == b->description_number;
+    return strcmp(cx_description_text(a), cx_description_text(b)) == 0;
+}
+
+/* json.dumps() of a description: a string, a number, or true/false. */
+static void cx_json_description(cx_buf *out, const cx_match *match)
+{
+    if (!match->description || match->description_kind == CX_DESCRIPTION_TEXT)
+        cx_json_string(out, cx_description_text(match));
+    else if (match->description_kind == CX_DESCRIPTION_BOOLEAN)
+        cx_buf_puts(out, match->description_number ? "true" : "false");
+    else
+        cx_buf_printf(out, "%lld", (long long)match->description_number);
+}
+
 static void cx_build_groups(const cx_options *options, const cx_match_list *matches, cx_groups *groups)
 {
     memset(groups, 0, sizeof(*groups));
@@ -180,8 +208,6 @@ static void cx_build_groups(const cx_options *options, const cx_match_list *matc
             if (t) cx_buf_puts(&tags, ", ");
             cx_buf_puts(&tags, match->tags[t]);
         }
-        /* A rule without a description shows its name. */
-        const char *description = match->description ? match->description : match->rule;
         cx_group *group = NULL;
         for (size_t g = 0; g < groups->count; ++g)
             if (strcmp(groups->items[g].tags, tags.data) == 0) group = &groups->items[g];
@@ -195,10 +221,11 @@ static void cx_build_groups(const cx_options *options, const cx_match_list *matc
             cx_buf_free(&tags);
         }
         bool seen = false;
-        for (size_t d = 0; d < group->count && !seen; ++d) seen = strcmp(group->descriptions[d], description) == 0;
+        for (size_t d = 0; d < group->count && !seen; ++d) seen = cx_same_description(group->descriptions[d], match);
         if (!seen) {
-            group->descriptions = (const char **)cx_realloc((void *)group->descriptions, (group->count + 1) * sizeof(char *));
-            group->descriptions[group->count++] = description;
+            group->descriptions =
+                (const cx_match **)cx_realloc((void *)group->descriptions, (group->count + 1) * sizeof(cx_match *));
+            group->descriptions[group->count++] = match;
         }
     }
 }
@@ -213,9 +240,10 @@ static void cx_free_groups(cx_groups *groups)
     memset(groups, 0, sizeof(*groups));
 }
 
-static int cx_compare_text(const void *a, const void *b)
+/* The console lists descriptions sorted by their text. */
+static int cx_compare_descriptions(const void *a, const void *b)
 {
-    return strcmp(*(const char *const *)a, *(const char *const *)b);
+    return strcmp(cx_description_text(*(const cx_match *const *)a), cx_description_text(*(const cx_match *const *)b));
 }
 
 static int cx_compare_groups(const void *a, const void *b)
@@ -227,7 +255,7 @@ static int cx_compare_groups(const void *a, const void *b)
 
 /* json.dumps() string with ensure_ascii=True. Bytes that are not UTF-8 are
  * written as lone surrogates, as Python's surrogateescape would. */
-static void cx_json_string(cx_buf *out, const char *text)
+void cx_json_string(cx_buf *out, const char *text)
 {
     const uint8_t *p = (const uint8_t *)text;
     size_t length = strlen(text);
@@ -286,7 +314,7 @@ static char *cx_build_json(const cx_output *output, const cx_results *results, b
             cx_buf_puts(&files, ": [");
             for (size_t d = 0; d < groups.items[g].count; ++d) {
                 if (d) cx_buf_puts(&files, ", ");
-                cx_json_string(&files, groups.items[g].descriptions[d]);
+                cx_json_description(&files, groups.items[g].descriptions[d]);
             }
             cx_buf_puts(&files, "]");
         }
@@ -334,7 +362,7 @@ static void cx_render_console(cx_output *output, const cx_results *results, cx_b
         }
         for (size_t g = 0; g < groups.count; ++g) {
             cx_group *group = &groups.items[g];
-            qsort((void *)group->descriptions, group->count, sizeof(char *), cx_compare_text);
+            qsort((void *)group->descriptions, group->count, sizeof(cx_match *), cx_compare_descriptions);
             cx_buf_puts(out, " |-> ");
             if (output->colorize) {
                 /* _colorize_tags(): color each tag of the group */
@@ -360,9 +388,9 @@ static void cx_render_console(cx_output *output, const cx_results *results, cx_b
             for (size_t d = 0; d < group->count; ++d) {
                 if (d) cx_buf_puts(out, ", ");
                 if (output->colorize)
-                    cx_buf_put_text(out, group->descriptions[d]);
+                    cx_buf_put_text(out, cx_description_text(group->descriptions[d]));
                 else
-                    cx_buf_puts(out, group->descriptions[d]);
+                    cx_buf_puts(out, cx_description_text(group->descriptions[d]));
             }
             cx_buf_putc(out, '\n');
         }

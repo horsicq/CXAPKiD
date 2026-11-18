@@ -126,37 +126,56 @@ elseif(NOT TARGET xxfclib::xxfclib)
     message(FATAL_ERROR "CXAPKiD needs xxyara's xxfclib closure or a complete xxfclib::xxfclib target")
 endif()
 
-add_executable(CXAPKiD
+set(_cxapkid_sources
     src/main.c
     src/cx_common.c
     src/cx_output.c
     src/cx_rules.c
     src/cx_scan.c)
+add_executable(CXAPKiD ${_cxapkid_sources})
 set_target_properties(CXAPKiD PROPERTIES
     OUTPUT_NAME cxapkid
-    C_STANDARD 11 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
-target_include_directories(CXAPKiD PRIVATE src)
-target_compile_definitions(CXAPKiD PRIVATE
-    CXAPKID_VERSION="${PROJECT_VERSION}"
-    CXAPKID_APKID_VERSION="${CXAPKID_APKID_VERSION}")
-target_link_libraries(CXAPKiD PRIVATE xxyara::xxyara)
-if(WIN32)
-    target_link_libraries(CXAPKiD PRIVATE shell32)
-    target_compile_definitions(CXAPKiD PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+set(_cxapkid_programs CXAPKiD)
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/cli.cmake")
+    # A test program, never installed or packaged: the same sources with
+    # CXAPKID_PARSE_TEST, which makes main.c print what it parsed from the
+    # command line instead of scanning (tests/cli.cmake,
+    # tests/argparse_parity.py). cxapkid itself has no such switch. It is
+    # built together with CXAPKiD so that the tests find it.
+    add_executable(CXAPKiD_parse_test ${_cxapkid_sources})
+    set_target_properties(CXAPKiD_parse_test PROPERTIES
+        OUTPUT_NAME cxapkid_parse_test
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests/bin")
+    target_compile_definitions(CXAPKiD_parse_test PRIVATE CXAPKID_PARSE_TEST)
+    add_dependencies(CXAPKiD CXAPKiD_parse_test)
+    list(APPEND _cxapkid_programs CXAPKiD_parse_test)
 endif()
-if(MSVC)
-    target_compile_options(CXAPKiD PRIVATE /W4 /utf-8)
-    # Complex rule conditions need more than Windows' default 1 MiB stack.
-    target_link_options(CXAPKiD PRIVATE /STACK:8388608)
-    target_compile_definitions(CXAPKiD PRIVATE _CRT_SECURE_NO_WARNINGS)
-else()
-    target_compile_options(CXAPKiD PRIVATE -Wall -Wextra -Wpedantic)
+foreach(_program IN LISTS _cxapkid_programs)
+    set_target_properties(${_program} PROPERTIES
+        C_STANDARD 11 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
+    target_include_directories(${_program} PRIVATE src)
+    target_compile_definitions(${_program} PRIVATE
+        CXAPKID_VERSION="${PROJECT_VERSION}"
+        CXAPKID_APKID_VERSION="${CXAPKID_APKID_VERSION}")
+    target_link_libraries(${_program} PRIVATE xxyara::xxyara)
     if(WIN32)
-        # Same 8 MiB stack as the MSVC build (ld's default is 2 MiB).
-        target_link_options(CXAPKiD PRIVATE -Wl,--stack,8388608)
+        target_link_libraries(${_program} PRIVATE shell32)
+        target_compile_definitions(${_program} PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
     endif()
-endif()
+    if(MSVC)
+        target_compile_options(${_program} PRIVATE /W4 /utf-8)
+        # Complex rule conditions need more than Windows' default 1 MiB stack.
+        target_link_options(${_program} PRIVATE /STACK:8388608)
+        target_compile_definitions(${_program} PRIVATE _CRT_SECURE_NO_WARNINGS)
+    else()
+        target_compile_options(${_program} PRIVATE -Wall -Wextra -Wpedantic)
+        if(WIN32)
+            # Same 8 MiB stack as the MSVC build (ld's default is 2 MiB).
+            target_link_options(${_program} PRIVATE -Wl,--stack,8388608)
+        endif()
+    endif()
+endforeach()
 
 install(TARGETS CXAPKiD RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(FILES README.md LICENSE DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/doc/CXAPKiD")
@@ -184,11 +203,12 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/cli.cmake")
     add_test(NAME cxapkid.cli
         COMMAND "${CMAKE_COMMAND}"
             "-DCXAPKID=$<TARGET_FILE:CXAPKiD>"
+            "-DCXAPKID_PARSE_TEST=$<TARGET_FILE:CXAPKiD_parse_test>"
             "-DDATA=${CMAKE_CURRENT_SOURCE_DIR}/tests/data"
             "-DTEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/tests/cli"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/cli.cmake")
     set_tests_properties(cxapkid.cli PROPERTIES TIMEOUT 120)
-    foreach(_regression path rules thread runtime_rules)
+    foreach(_regression path rules thread runtime_rules report)
         if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/${_regression}_regressions.cmake")
             continue()
         endif()
