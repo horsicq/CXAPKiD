@@ -47,9 +47,13 @@ endfunction()
 cxapkid_add_dependencies()
 
 # APKiD reads ZIP members with Python's zipfile: stored, Deflate, bzip2 and
-# LZMA, plus XZ for method 95. xxyara's closure has Deflate; add xxfclib's
-# bzip2 and LZMA codecs and its file-system API to the same library.
+# LZMA, plus XZ for method 95 (xxfclib's xx_zip_py). xxyara's closure has
+# Deflate, CRC and SHA; add xxfclib's zipfile-exact reader, YARA 3.11's legacy
+# dex values (xx_dex_legacy), the bzip2 and LZMA codecs and the file-system
+# API to the same library.
 set(_cxapkid_xxfclib_extra
+    src/formats/archive/zip/xx_zip_py.c
+    src/formats/executable/dex/xx_dex_legacy.c
     src/algo/bzip2/xx_bzip2.c
     src/algo/bzip2/xx_bzip2_bwt.c
     src/algo/bzip2/xx_bzip2_dec.c
@@ -120,13 +124,9 @@ endif()
 add_executable(CXAPKiD
     src/main.c
     src/cx_common.c
-    src/cx_dex.c
     src/cx_output.c
     src/cx_rules.c
-    src/cx_scan.c
-    src/cx_sink.c
-    src/cx_xz.c
-    src/cx_zip.c)
+    src/cx_scan.c)
 set_target_properties(CXAPKiD PROPERTIES
     OUTPUT_NAME cxapkid
     C_STANDARD 11 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF

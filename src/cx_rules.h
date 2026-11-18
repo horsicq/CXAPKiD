@@ -19,6 +19,13 @@
 extern "C" {
 #endif
 
+/* Values of YARA 3.11's dex module that YARA-X lacks: globals defined for
+ * every rule set and set before each scan from xxfclib's
+ * xx_dex_legacy_analyze() (xxfclib/formats/executable/dex/xx_dex_legacy.h). */
+#define CX_GLOBAL_UNICODE_FIELD_NAMES "cxapkid_dex_unicode_field_names"
+#define CX_GLOBAL_UNICODE_METHOD_NAMES "cxapkid_dex_unicode_method_names"
+#define CX_GLOBAL_UNSORTED_STRING_POOL "cxapkid_dex_unsorted_string_pool"
+
 typedef struct cx_rules {
     YRX_RULES *rules;
     char sha256[65];

@@ -3,12 +3,15 @@
  * Copyright (C) 2026 hors <horsicq@gmail.com>
  * SPDX-License-Identifier: MIT
  */
-#if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
+/* POSIX 2008 for readlink() on Linux. Not on the BSDs and macOS: there a
+ * _POSIX_C_SOURCE hides the extensions used below (sysctl() and
+ * KERN_PROC_PATHNAME on FreeBSD), and their default visibility already
+ * includes POSIX 2008. */
+#if !defined(_WIN32) && !defined(__FreeBSD__) && !defined(__APPLE__) && !defined(_POSIX_C_SOURCE)
 #define _POSIX_C_SOURCE 200809L
 #endif
 
 #include "cx_rules.h"
-#include "cx_dex.h"
 
 #include <xxfclib/algo/sha/xx_sha.h>
 #include <xxfclib/fs/xx_fs.h>
@@ -190,6 +193,57 @@ static char *cx_rules_normalize(const char *path)
     return cx_buf_detach(&out);
 }
 
+/* The end of the first `count` '/'-separated components at `from` (after the
+ * separator that ends the last one, or at the end of the string). */
+static size_t cx_rules_skip_components(const char *path, size_t from, unsigned count)
+{
+    while (count--) {
+        const char *slash = strchr(path + from, '/');
+        if (!slash) return strlen(path);
+        from = (size_t)(slash - path) + 1;
+    }
+    return from;
+}
+
+static bool cx_rules_drive(const char *path)
+{
+    return ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z')) && path[1] == ':' &&
+           path[2] == '/';
+}
+
+/* A path with '/' separators and "." / ".." collapsed, keeping its root:
+ * "/" (POSIX), "C:/" (drive), "//server/share/" (UNC), "//?/C:/" and
+ * "//?/UNC/server/share/" (Windows extended-length paths; "//./" likewise),
+ * so an executable or a rule directory on a network share or a long path
+ * still resolves. When ".." would leave the root, the path is returned with
+ * '/' separators only, uncollapsed (it then names no collected file). */
+static char *cx_rules_canonical(const char *path)
+{
+    char *copy = cx_strdup(path);
+    for (char *p = copy; *p; ++p)
+        if (*p == '\\') *p = '/';
+    size_t root = 0;
+    if (copy[0] == '/' && copy[1] == '/' && (copy[2] == '?' || copy[2] == '.') && copy[3] == '/') {
+        root = 4;
+        if (strncmp(copy + 4, "UNC/", 4) == 0)
+            root = cx_rules_skip_components(copy, 8, 2); /* //?/UNC/server/share/ */
+        else if (cx_rules_drive(copy + 4))
+            root = 7; /* //?/C:/ */
+    } else if (copy[0] == '/' && copy[1] == '/') {
+        root = cx_rules_skip_components(copy, 2, 2); /* //server/share/ */
+    } else if (cx_rules_drive(copy)) {
+        root = 3; /* C:/ */
+    } else if (copy[0] == '/') {
+        root = 1;
+    }
+    char *rest = cx_rules_normalize(copy + root);
+    if (!rest) return copy;
+    char *canonical = cx_format("%.*s%s", (int)root, copy, rest);
+    free(rest);
+    free(copy);
+    return canonical;
+}
+
 static void cx_rules_walk(cx_source_set *set, const char *directory, const char *relative)
 {
     xx_list_t entries;
@@ -246,28 +300,22 @@ static cx_source *cx_rules_resolve(cx_source_set *set, const cx_source *from, co
         const char *base = cx_path_basename(from->key);
         path = cx_format("%.*s%s", (int)(base - from->key), from->key, include);
     }
-    for (char *p = path; *p; ++p)
-        if (*p == '\\') *p = '/';
-    char *key = cx_rules_normalize(path);
-    if (!key) key = cx_strdup(path);
-    if (path[0] == '/' && key[0] != '/') {
-        char *rooted = cx_format("/%s", key);
-        free(key);
-        key = rooted;
-    }
+    char *key = cx_rules_canonical(path);
     free(path);
     cx_source *found = NULL;
     for (size_t i = 0; i < set->count && !found; ++i) {
-        char *normalized = cx_strdup(set->items[i].key);
-        for (char *p = normalized; *p; ++p)
-            if (*p == '\\') *p = '/';
-        char *candidate = cx_rules_normalize(normalized);
-        if (candidate && (strcmp(candidate, key) == 0 || (key[0] == '/' && strcmp(candidate, key + 1) == 0)))
-            found = &set->items[i];
+        char *candidate = cx_rules_canonical(set->items[i].key);
+        if (strcmp(candidate, key) == 0) found = &set->items[i];
         free(candidate);
-        free(normalized);
     }
     if (!found) {
+#ifdef _WIN32
+        /* Extended-length (\\?\) paths are not normalized by Windows, so
+           UNC and extended keys go back to '\' before the file is opened. */
+        if (key[0] == '/' && key[1] == '/')
+            for (char *p = key; *p; ++p)
+                if (*p == '/') *p = '\\';
+#endif
         if (!xx_fs_is_file(key)) {
             *error = cx_format("%s: include file not found: %s", from->name, include);
             free(key);
@@ -467,7 +515,7 @@ bool cx_rules_load(cx_rules *rules, const char *rules_dir, bool include_trackers
     /* yara-python never shows compiler warnings, and neither does CXAPKiD:
        not collecting them saves about a tenth of the compile. */
     (void)yrx_compiler_max_warnings(compiler, 0);
-    /* Values of YARA 3.11's dex module that YARA-X lacks (cx_dex.h). */
+    /* Values of YARA 3.11's dex module that YARA-X lacks (cx_rules.h). */
     if (yrx_compiler_define_global_int(compiler, CX_GLOBAL_UNICODE_FIELD_NAMES, 0) != YRX_SUCCESS ||
         yrx_compiler_define_global_int(compiler, CX_GLOBAL_UNICODE_METHOD_NAMES, 0) != YRX_SUCCESS ||
         yrx_compiler_define_global_bool(compiler, CX_GLOBAL_UNSORTED_STRING_POOL, false) != YRX_SUCCESS) {

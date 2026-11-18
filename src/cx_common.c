@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void cx_out_of_memory(void)
+void cx_out_of_memory(void)
 {
     fputs("cxapkid: out of memory\n", stderr);
     exit(1);
@@ -220,30 +220,4 @@ size_t cx_utf8_decode(const uint8_t *text, size_t length, int32_t *code_point)
     if (c < minimum || c > 0x10FFFF || (c >= 0xD800 && c <= 0xDFFF)) return 1;
     *code_point = (int32_t)c;
     return needed + 1;
-}
-
-void cx_utf8_encode(cx_buf *buffer, uint32_t code_point)
-{
-    char out[4];
-    size_t length;
-    if (code_point < 0x80) {
-        out[0] = (char)code_point;
-        length = 1;
-    } else if (code_point < 0x800) {
-        out[0] = (char)(0xC0 | (code_point >> 6));
-        out[1] = (char)(0x80 | (code_point & 0x3F));
-        length = 2;
-    } else if (code_point < 0x10000) {
-        out[0] = (char)(0xE0 | (code_point >> 12));
-        out[1] = (char)(0x80 | ((code_point >> 6) & 0x3F));
-        out[2] = (char)(0x80 | (code_point & 0x3F));
-        length = 3;
-    } else {
-        out[0] = (char)(0xF0 | (code_point >> 18));
-        out[1] = (char)(0x80 | ((code_point >> 12) & 0x3F));
-        out[2] = (char)(0x80 | ((code_point >> 6) & 0x3F));
-        out[3] = (char)(0x80 | (code_point & 0x3F));
-        length = 4;
-    }
-    cx_buf_append(buffer, out, length);
 }

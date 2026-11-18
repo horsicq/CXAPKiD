@@ -3,6 +3,7 @@
 """Assemble an executable and adapted APKiD rules; never build or download."""
 import argparse
 import pathlib
+import re
 import shutil
 import sys
 import tempfile
@@ -26,6 +27,15 @@ def dependency_notices(root):
             if not path.is_file():
                 raise ValueError(f"{path}: required dependency license is missing")
             notices[pathlib.Path("licenses") / library / name] = path.read_bytes()
+        # Every other notice the dependency ships (xxfclib's LICENSE.UNICODE, xxyara's third-party notices), as
+        # CMake's install() of LICENSE* does.
+        for path in sorted(source.glob("LICENSE*")):
+            key = pathlib.Path("licenses") / library / path.name
+            # Notice files are LICENSE or LICENSE.<UPPER-CASE NAME>; skip editor/patch leftovers (LICENSE.bak, .orig).
+            if not re.fullmatch(r"LICENSE(?:\.[A-Z0-9_-]+)?", path.name):
+                continue
+            if path.is_file() and key not in notices:
+                notices[key] = path.read_bytes()
     return notices
 
 

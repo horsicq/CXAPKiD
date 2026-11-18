@@ -8,11 +8,11 @@
 #endif
 
 #include "cx_apkid.h"
-#include "cx_dex.h"
-#include "cx_xz.h"
-#include "cx_zip.h"
+#include "cx_rules.h"
 
 #include <xxyara_ext.h>
+#include <xxfclib/formats/archive/zip/xx_zip_py.h>
+#include <xxfclib/formats/executable/dex/xx_dex_legacy.h>
 #include <xxfclib/fs/xx_fs.h>
 #include <xxfclib/list/xx_list.h>
 #include <xxfclib/strings/xx_string.h>
@@ -78,7 +78,7 @@ static bool cx_is_zipfile(const cx_scanner *scanner, const uint8_t *data, size_t
 {
     if (scanner->options->typing == CX_TYPING_FILENAME)
         return cx_ends_with_nocase(name, ".apk") || cx_ends_with_nocase(name, ".zip") || cx_ends_with_nocase(name, ".jar");
-    return cx_type_file(data, size) == CX_FILE_ZIP && cx_zip_is_zipfile(data, size);
+    return cx_type_file(data, size) == CX_FILE_ZIP && xx_zip_py_is_zipfile(data, size);
 }
 
 void cx_match_list_free(cx_match_list *list)
@@ -367,7 +367,7 @@ static YRX_RESULT cx_create_yrx(cx_scanner *scanner, YRX_SCANNER **yrx, bool tim
 
 /* One scan: the legacy module state for this buffer, then the rules. */
 static YRX_RESULT cx_run_scan(cx_scanner *scanner, YRX_SCANNER *yrx, const uint8_t *data, size_t size,
-                              const cx_dex_legacy *legacy, cx_match_list *out)
+                              const xx_dex_legacy *legacy, cx_match_list *out)
 {
     static const uint8_t empty[1] = {0};
     YRX_RESULT result;
@@ -464,7 +464,7 @@ static void cx_match_copy(cx_match *to, const cx_match *from)
 static bool cx_match_data(cx_scanner *scanner, const uint8_t *data, size_t size, cx_match_list *out, char **error)
 {
     YRX_RESULT result;
-    cx_dex_legacy legacy;
+    xx_dex_legacy legacy;
     memset(out, 0, sizeof(*out));
     /* A worker creates its YARA-X scanner on its own thread when it first
        has data to scan: building one costs as much as copying every rule,
@@ -474,7 +474,7 @@ static bool cx_match_data(cx_scanner *scanner, const uint8_t *data, size_t size,
         scanner->yrx = NULL;
         return false;
     }
-    cx_dex_legacy_analyze(data, size, &legacy);
+    if (!xx_dex_legacy_analyze(data, size, &legacy)) cx_out_of_memory();
     result = cx_run_scan(scanner, scanner->yrx, data, size, &legacy, out);
     if (result == YRX_SUCCESS) {
         if (scanner->record && scanner->log) {
@@ -500,7 +500,7 @@ static void cx_report(cx_scanner *scanner, const char *what, const char *message
     cx_log_emit(scanner->log, 2, cx_format("Exception scanning %s: %s\n", what, message));
 }
 
-static void cx_report_entry(cx_scanner *scanner, const cx_zip_info *info, const char *prefix, int64_t depth,
+static void cx_report_entry(cx_scanner *scanner, const xx_zip_py_info *info, const char *prefix, int64_t depth,
                             const char *message)
 {
     char *what = cx_format("%s in %s, depth=%lld", info->filename, prefix, (long long)depth);
@@ -529,19 +529,19 @@ static void cx_print_found(cx_scanner *scanner, const char *key, const cx_match_
         cx_buf_free(&text);
 }
 
-static void cx_scan_zip(cx_scanner *scanner, const cx_zip *zip, int64_t depth, const char *prefix, cx_results *results);
+static void cx_scan_zip(cx_scanner *scanner, const xx_zip_py *zip, int64_t depth, const char *prefix, cx_results *results);
 
 /* A member job of a parallel run that may hand its nested archive's members
  * to other threads (see cx_pool_spawn). */
 typedef struct cx_spawn cx_spawn;
-static bool cx_pool_spawn(cx_spawn *spawn, const cx_zip_info *info, const char *prefix, uint8_t *data, size_t size,
-                          cx_zip_owner owner);
+static bool cx_pool_spawn(cx_spawn *spawn, const xx_zip_py_info *info, const char *prefix, uint8_t *data, size_t size,
+                          xx_zip_py_owner owner);
 
 /* Scanner._scan_zip_entry(). With `spawn`, a member that is an archive to
  * scan may continue as jobs of the parallel run: then the rules over the
  * member and each nested member are separate jobs, written out in the same
  * order as here. */
-static void cx_scan_zip_entry(cx_scanner *scanner, const cx_zip *zip, const cx_zip_info *info, int64_t depth,
+static void cx_scan_zip_entry(cx_scanner *scanner, const xx_zip_py *zip, const xx_zip_py_info *info, int64_t depth,
                               const char *prefix, cx_results *results, cx_spawn *spawn)
 {
     const cx_options *options = scanner->options;
@@ -550,24 +550,25 @@ static void cx_scan_zip_entry(cx_scanner *scanner, const cx_zip *zip, const cx_z
     uint8_t *data = NULL;
     size_t size = 0;
     bool complete = false;
-    cx_zip_owner owner = CX_ZIP_OWNED; /* how data is released (borrowed: a stored member) */
-    cx_zip_status status = cx_zip_open_entry(zip, info, &data_offset, &warning, &error);
+    xx_zip_py_owner owner = XX_ZIP_PY_OWNED; /* how data is released (borrowed: a stored member) */
+    xx_zip_py_status status = xx_zip_py_open_entry(zip, info, &data_offset, &warning, &error);
 
+    if (status == XX_ZIP_PY_NO_MEMORY) cx_out_of_memory();
     if (warning) {
         if (options->verbose) cx_log_emit(scanner->log, 2, cx_format("UserWarning: %s\n", warning));
-        free(warning);
+        xx_zip_py_free_text(warning);
     }
-    if (status == CX_ZIP_OVERLAPPED) {
+    if (status == XX_ZIP_PY_OVERLAPPED) {
         if (options->verbose)
             cx_log_emit(scanner->log, 1,
                         cx_format("[W] Skipping overlapped entry %s (possible zip bomb)\n", info->filename));
-        free(error);
+        xx_zip_py_free_text(error);
         return;
     }
-    if (status == CX_ZIP_NOT_IMPLEMENTED) {
-        free(error);
+    if (status == XX_ZIP_PY_NOT_IMPLEMENTED) {
+        xx_zip_py_free_text(error);
         error = NULL;
-        if (info->compress_type != CX_ZIP_XZ) {
+        if (info->compress_type != XX_ZIP_PY_XZ) {
             cx_log_emit(scanner->log, 1,
                         cx_format("[E] Unsupported compression method %u for %s\n", (unsigned)info->compress_type,
                                   info->filename));
@@ -577,47 +578,47 @@ static void cx_scan_zip_entry(cx_scanner *scanner, const cx_zip *zip, const cx_z
            and scans it without the typing check. */
         const uint8_t *raw = NULL;
         size_t raw_size = 0;
-        if (!cx_zip_raw_data(zip, info, &raw, &raw_size)) {
+        if (!xx_zip_py_raw_data(zip, info, &raw, &raw_size)) {
             cx_log_emit(scanner->log, 1,
                         cx_format("[E] Failed to decompress %s: %s\n", info->filename, "truncated local file header"));
             return;
         }
-        if (!cx_xz_decompress(raw, raw_size, &data, &size, &error)) {
+        if (!xx_zip_py_xz_decompress(raw, raw_size, &data, &size, &error)) {
             cx_log_emit(scanner->log, 1,
                         cx_format("[E] Failed to decompress %s: %s\n", info->filename, error ? error : "error"));
-            free(error);
+            xx_zip_py_free_text(error);
             return;
         }
-    } else if (status != CX_ZIP_OK) {
+    } else if (status != XX_ZIP_PY_OK) {
         cx_report_entry(scanner, info, prefix, depth, error);
-        free(error);
+        xx_zip_py_free_text(error);
         return;
     } else {
         if (options->typing == CX_TYPING_MAGIC) {
             /* entry.read(4), then the magic test. ZipExtFile reads at least
                MIN_READ_SIZE (4096) bytes, so a member that ends within them
                is complete, and CRC checked, already at this point. */
-            status = cx_zip_read(zip, info, data_offset, 4096, &data, &size, &complete, &owner, &error);
-            if (status == CX_ZIP_OK && !cx_should_scan(scanner, data, size, info->filename)) {
-                cx_zip_free(data, owner);
+            status = xx_zip_py_read(zip, info, data_offset, 4096, &data, &size, &complete, &owner, &error);
+            if (status == XX_ZIP_PY_OK && !cx_should_scan(scanner, data, size, info->filename)) {
+                xx_zip_py_free(data, owner);
                 return;
             }
-            if (status == CX_ZIP_OK && !complete) {
-                cx_zip_free(data, owner);
+            if (status == XX_ZIP_PY_OK && !complete) {
+                xx_zip_py_free(data, owner);
                 data = NULL;
-                status = cx_zip_read(zip, info, data_offset, 0, &data, &size, &complete, &owner, &error);
+                status = xx_zip_py_read(zip, info, data_offset, 0, &data, &size, &complete, &owner, &error);
             }
         } else {
             if (!cx_should_scan(scanner, NULL, 0, info->filename)) return;
-            status = cx_zip_read(zip, info, data_offset, 0, &data, &size, &complete, &owner, &error);
+            status = xx_zip_py_read(zip, info, data_offset, 0, &data, &size, &complete, &owner, &error);
         }
-        if (status == CX_ZIP_OVERLAPPED) {
-            free(error);
+        if (status == XX_ZIP_PY_OVERLAPPED) {
+            xx_zip_py_free_text(error);
             return;
         }
-        if (status != CX_ZIP_OK) {
+        if (status != XX_ZIP_PY_OK) {
             cx_report_entry(scanner, info, prefix, depth, error);
-            free(error);
+            xx_zip_py_free_text(error);
             return;
         }
     }
@@ -634,7 +635,7 @@ static void cx_scan_zip_entry(cx_scanner *scanner, const cx_zip *zip, const cx_z
         cx_report_entry(scanner, info, prefix, depth, error);
         free(error);
         free(key);
-        cx_zip_free(data, owner);
+        xx_zip_py_free(data, owner);
         return;
     }
     if (matches.count) {
@@ -642,24 +643,26 @@ static void cx_scan_zip_entry(cx_scanner *scanner, const cx_zip *zip, const cx_z
         cx_results_set(results, cx_strdup(key), &matches);
     }
     if (depth < options->scan_depth && cx_is_zipfile(scanner, data, size, info->filename)) {
-        cx_zip nested;
-        if (cx_zip_open(&nested, data, size, &error) != CX_ZIP_OK) {
+        xx_zip_py nested;
+        xx_zip_py_status opened = xx_zip_py_open(&nested, data, size, &error);
+        if (opened == XX_ZIP_PY_NO_MEMORY) cx_out_of_memory();
+        if (opened != XX_ZIP_PY_OK) {
             cx_report_entry(scanner, info, prefix, depth, error);
-            free(error);
+            xx_zip_py_free_text(error);
         } else {
             cx_scan_zip(scanner, &nested, depth + 1, key, results);
-            cx_zip_close(&nested);
+            xx_zip_py_close(&nested);
         }
     }
     free(key);
-    cx_zip_free(data, owner);
+    xx_zip_py_free(data, owner);
 }
 
 /* Scanner._scan_zip() */
-static void cx_scan_zip(cx_scanner *scanner, const cx_zip *zip, int64_t depth, const char *prefix, cx_results *results)
+static void cx_scan_zip(cx_scanner *scanner, const xx_zip_py *zip, int64_t depth, const char *prefix, cx_results *results)
 {
     for (size_t i = 0; i < zip->count; ++i) {
-        if (cx_zip_info_is_dir(&zip->infos[i])) continue;
+        if (xx_zip_py_info_is_dir(&zip->infos[i])) continue;
         cx_scan_zip_entry(scanner, zip, &zip->infos[i], depth, prefix, results, NULL);
     }
 }
@@ -694,20 +697,20 @@ static void cx_scan_whole(cx_scanner *scanner, const uint8_t *data, size_t size,
  * while the rules over the member run; if those fail, the sequential scan
  * stops there, so the nested jobs' output is dropped. */
 typedef struct cx_group {
-    const cx_zip_info *info; /* the member */
+    const xx_zip_py_info *info; /* the member */
     const char *prefix;
     char *key;               /* prefix!member */
     uint8_t *data;           /* the member's bytes, shared by the group */
     size_t size;
-    cx_zip_owner owner;
-    cx_zip zip;              /* the member as an archive */
+    xx_zip_py_owner owner;
+    xx_zip_py zip;           /* the member as an archive */
     size_t pending;          /* jobs of the group not finished */
     bool match_failed;
 } cx_group;
 
 typedef struct cx_job {
     const char *path;          /* file job */
-    const cx_zip_info *info;   /* member job (nested member in a group) */
+    const xx_zip_py_info *info; /* member job (nested member in a group) */
     bool archive;              /* the archive itself (rules.match on all of it) */
     cx_group *group;           /* a job of a group: the rules over the member when info is NULL */
     uint64_t cost;             /* start order: the largest first */
@@ -733,7 +736,7 @@ typedef struct cx_pool {
     size_t queue_next;
     size_t queue_count;
     size_t queue_capacity;
-    const cx_zip *zip; /* member and archive jobs */
+    const xx_zip_py *zip; /* member and archive jobs */
     const char *prefix;
     cx_results *results;
     /* Scan records replayed (see cx_pool_merge): the namespaces' order of
@@ -795,25 +798,27 @@ static size_t *cx_rank_jobs(const cx_job *jobs, size_t count)
 
 /* An estimate of a member job's work, for its start order only: the bytes
  * it scans, twice for a compressed member (decompression, then the scan). */
-static uint64_t cx_member_cost(const cx_zip_info *info)
+static uint64_t cx_member_cost(const xx_zip_py_info *info)
 {
     uint64_t size = info->file_size > ((uint64_t)1 << 62) ? ((uint64_t)1 << 62) : info->file_size;
-    return info->compress_type == CX_ZIP_STORED ? size : size * 2;
+    return info->compress_type == XX_ZIP_PY_STORED ? size : size * 2;
 }
 
 /* The member's data is an archive with members: continue as a group of jobs
  * (see above). False leaves everything to the caller, unchanged. */
-static bool cx_pool_spawn(cx_spawn *spawn, const cx_zip_info *info, const char *prefix, uint8_t *data, size_t size,
-                          cx_zip_owner owner)
+static bool cx_pool_spawn(cx_spawn *spawn, const xx_zip_py_info *info, const char *prefix, uint8_t *data, size_t size,
+                          xx_zip_py_owner owner)
 {
     cx_pool *pool = spawn->pool;
-    cx_zip nested;
-    if (cx_zip_open(&nested, data, size, NULL) != CX_ZIP_OK) return false; /* reported after the rules, as before */
+    xx_zip_py nested;
+    xx_zip_py_status opened = xx_zip_py_open(&nested, data, size, NULL);
+    if (opened == XX_ZIP_PY_NO_MEMORY) cx_out_of_memory();
+    if (opened != XX_ZIP_PY_OK) return false; /* reported after the rules, as before */
     size_t members = 0;
     for (size_t i = 0; i < nested.count; ++i)
-        if (!cx_zip_info_is_dir(&nested.infos[i])) ++members;
+        if (!xx_zip_py_info_is_dir(&nested.infos[i])) ++members;
     if (!members) {
-        cx_zip_close(&nested);
+        xx_zip_py_close(&nested);
         return false;
     }
     cx_group *group = (cx_group *)cx_calloc(1, sizeof(*group));
@@ -830,7 +835,7 @@ static bool cx_pool_spawn(cx_spawn *spawn, const cx_zip_info *info, const char *
     children[0].cost = size;
     size_t count = 1;
     for (size_t i = 0; i < group->zip.count; ++i) {
-        if (cx_zip_info_is_dir(&group->zip.infos[i])) continue;
+        if (xx_zip_py_info_is_dir(&group->zip.infos[i])) continue;
         children[count].group = group;
         children[count].info = &group->zip.infos[i];
         children[count].cost = cx_member_cost(&group->zip.infos[i]);
@@ -984,8 +989,8 @@ static void cx_pool_finish(cx_pool *pool, cx_job *job, bool taken)
     if (pool->cond) xx_cond_broadcast(pool->cond);
     xx_mutex_unlock(pool->mutex);
     if (finished) {
-        cx_zip_close(&finished->zip);
-        cx_zip_free(finished->data, finished->owner);
+        xx_zip_py_close(&finished->zip);
+        xx_zip_py_free(finished->data, finished->owner);
         finished->data = NULL;
         free(finished->key);
         finished->key = NULL;
@@ -1151,16 +1156,18 @@ static void cx_scan_file_obj(cx_scanner *scanner, const uint8_t *data, size_t si
     }
     /* The archive is opened before the whole-file scan, which does not
        depend on it; a failure is reported after that scan, as before. */
-    cx_zip zip;
-    if (cx_zip_open(&zip, data, size, &error) != CX_ZIP_OK) {
+    xx_zip_py zip;
+    xx_zip_py_status opened = xx_zip_py_open(&zip, data, size, &error);
+    if (opened == XX_ZIP_PY_NO_MEMORY) cx_out_of_memory();
+    if (opened != XX_ZIP_PY_OK) {
         cx_scan_whole(scanner, data, size, file_path, results);
         cx_report(scanner, file_path, error ? error : "error");
-        free(error);
+        xx_zip_py_free_text(error);
         return;
     }
     size_t members = 0;
     for (size_t i = 0; i < zip.count; ++i)
-        if (!cx_zip_info_is_dir(&zip.infos[i])) ++members;
+        if (!xx_zip_py_info_is_dir(&zip.infos[i])) ++members;
     /* The whole-file scan (job 0) and the members of the outermost archive
        in parallel, unless this scan is itself a job of a parallel run. The
        jobs' matches can be put in the sequential order (cx_pool_merge) only
@@ -1175,7 +1182,7 @@ static void cx_scan_file_obj(cx_scanner *scanner, const uint8_t *data, size_t si
         pool.jobs[0].cost = size;
         pool.count = 1;
         for (size_t i = 0; i < zip.count; ++i) {
-            if (cx_zip_info_is_dir(&zip.infos[i])) continue;
+            if (xx_zip_py_info_is_dir(&zip.infos[i])) continue;
             pool.jobs[pool.count].info = &zip.infos[i];
             pool.jobs[pool.count].cost = cx_member_cost(&zip.infos[i]);
             ++pool.count;
@@ -1191,7 +1198,7 @@ static void cx_scan_file_obj(cx_scanner *scanner, const uint8_t *data, size_t si
         cx_scan_whole(scanner, data, size, file_path, results);
         cx_scan_zip(scanner, &zip, 0, file_path, results);
     }
-    cx_zip_close(&zip);
+    xx_zip_py_close(&zip);
 }
 
 /* File jobs retain their results until the ordered flusher writes them. */
@@ -1316,7 +1323,8 @@ static void cx_collect_walk(cx_scanner *scanner, const char *directory, cx_paths
 {
     xx_list_t entries;
     if (!cx_list_directory(directory, &entries)) {
-        cx_report(scanner, directory, "could not list the directory");
+        /* os.walk(onerror=None): a directory that cannot be listed is
+           skipped without a message. */
         cx_free_entries(&entries);
         return;
     }

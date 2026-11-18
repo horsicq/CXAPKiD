@@ -13,7 +13,9 @@ echo cxapkid package: Python 3 is required; set PYTHON to its executable path 1>
 exit /b 1
 
 :custom_python
-"%PYTHON%" "%~dp0..\cmake\package_cxapkid.py" --platform windows %*
+rem PYTHON may be given with or without quotes ("C:\Program Files\...\python.exe").
+set "CX_PYTHON=%PYTHON:"=%"
+"%CX_PYTHON%" "%~dp0..\cmake\package_cxapkid.py" --platform windows %*
 exit /b %errorlevel%
 
 :python_launcher

@@ -25,6 +25,7 @@ extern "C" {
  * is exhausted while building small bookkeeping structures, so these report
  * and exit. Large, input-driven buffers (decompressed entries, file data)
  * use the plain allocator and fail gracefully instead. */
+void cx_out_of_memory(void);
 void *cx_malloc(size_t size);
 void *cx_calloc(size_t count, size_t size);
 void *cx_realloc(void *block, size_t size);
@@ -62,7 +63,6 @@ bool cx_is_path_sep(char c);
  * (one byte is consumed then). Surrogates and overlong forms are invalid,
  * as in Python's strict UTF-8 codec. */
 size_t cx_utf8_decode(const uint8_t *text, size_t length, int32_t *code_point);
-void cx_utf8_encode(cx_buf *buffer, uint32_t code_point);
 
 #ifdef __cplusplus
 }

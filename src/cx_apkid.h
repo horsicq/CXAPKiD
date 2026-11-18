@@ -50,7 +50,7 @@ typedef struct cx_options {
     bool print_matches;          /* print filter active */
     cx_name_set print_include;
     cx_name_set print_exclude;
-    const char *rules_dir;       /* NULL: rules built into the executable */
+    const char *rules_dir;       /* NULL: the rules/ folder next to the executable */
     int64_t threads;             /* ZIP members scanned in parallel; <= 0 auto */
 } cx_options;
 
