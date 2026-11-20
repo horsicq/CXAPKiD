@@ -97,10 +97,7 @@ if(TARGET xxyara_xxfclib)
     foreach(_source IN LISTS _cxapkid_xxfclib_extra)
         set(_path "${CXAPKID_XXFCLIB_DIR}/${_source}")
         if(NOT EXISTS "${_path}")
-            file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/xxfclib-revision.txt"
-                _cxapkid_xxfclib_revision LIMIT_COUNT 1)
             message(FATAL_ERROR "xxfclib source file is missing: ${_path}\n"
-                "CXAPKiD uses xxfclib revision ${_cxapkid_xxfclib_revision}.\n"
                 "Update the checkout with git submodule update --init --recursive, "
                 "or set CXAPKID_XXFCLIB_DIR to a compatible source tree.")
         endif()
