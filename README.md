@@ -44,7 +44,7 @@ cxapkid -h              # All options
 Keep `rules/` beside the executable. Rules are loaded from that folder, never
 embedded in the binary. Use `--rules-dir DIR` to select another rule directory.
 
-On Windows (MSVC x64) `cxapkid.exe` is linked with xxfclib's C runtime instead of
+On Windows (MSVC, x64 and x86) `cxapkid.exe` is linked with xxfclib's C runtime instead of
 Microsoft's: `KERNEL32.dll` is its only import and no Visual C++ redistributable
 is needed. Configure with `-DCXAPKID_NO_CRT=OFF` to link Microsoft's runtime.
 

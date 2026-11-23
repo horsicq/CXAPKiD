@@ -38,14 +38,14 @@ endif()
 
 # xxyara builds the focused set of xxfclib components its scanner needs.
 # The application owns its console; dependency tools and tests stay disabled.
-# CXAPKID_NO_CRT (MSVC x64, where it is the default): link cxapkid without the
+# CXAPKID_NO_CRT (MSVC x64 and x86, where it is the default): link cxapkid without the
 # Microsoft C runtime, on xxfclib's own (xxfclib docs/CRT.md), so that
 # KERNEL32.dll is its only import.
 set(_cxapkid_no_crt_default OFF)
-if(CXAPKID_MSVC_ARCH STREQUAL "x64")
+if(CXAPKID_MSVC_ARCH)
     set(_cxapkid_no_crt_default ON)
 endif()
-option(CXAPKID_NO_CRT "Link cxapkid with xxfclib's C runtime instead of Microsoft's (MSVC x64)"
+option(CXAPKID_NO_CRT "Link cxapkid with xxfclib's C runtime instead of Microsoft's (MSVC x64, x86)"
     ${_cxapkid_no_crt_default})
 if(CXAPKID_NO_CRT AND NOT CXAPKID_MSVC_ARCH)
     message(FATAL_ERROR "CXAPKID_NO_CRT needs MSVC for x64 or x86")
