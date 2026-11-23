@@ -44,6 +44,16 @@ cxapkid -h              # All options
 Keep `rules/` beside the executable. Rules are loaded from that folder, never
 embedded in the binary. Use `--rules-dir DIR` to select another rule directory.
 
+On Windows (MSVC x64) `cxapkid.exe` is linked with xxfclib's C runtime instead of
+Microsoft's: `KERNEL32.dll` is its only import and no Visual C++ redistributable
+is needed. Configure with `-DCXAPKID_NO_CRT=OFF` to link Microsoft's runtime.
+
+By default the output is the same as APKiD's, including its limits: APKiD's dex
+module does not parse DEX 039 and newer, and such files are reported as
+`yara_issue : yara issue - dex file recognized by apkid but not yara module`.
+`--dex-all-versions` lets the dex module parse them, so the rules that depend
+on it (the compiler rules, for example) can match.
+
 ## License
 
 The scanner source is [MIT licensed](LICENSE). APKiD's rules are Copyright (C)

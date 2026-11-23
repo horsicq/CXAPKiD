@@ -375,6 +375,24 @@ static YRX_RESULT cx_create_yrx(cx_scanner *scanner, YRX_SCANNER **yrx, bool tim
     return YRX_SUCCESS;
 }
 
+/* --dex-all-versions: a DEX that YARA 3.11 rejects only for its version
+ * (039 and newer) is treated as parsed. The values the legacy module would
+ * have given are computed over a copy that carries version 038; the layout
+ * those values depend on is the same. */
+static void cx_newer_dex_analyze(const uint8_t *data, size_t size, xx_dex_legacy *legacy)
+{
+    uint8_t *copy;
+    if (size < 8 || memcmp(data, "dex\n0", 5) != 0 || data[7] != 0) return;
+    if (data[5] < '0' || data[5] > '9' || data[6] < '0' || data[6] > '9') return;
+    if ((data[5] - '0') * 10 + (data[6] - '0') < 39) return;
+    copy = (uint8_t *)cx_malloc(size);
+    memcpy(copy, data, size);
+    copy[5] = '3';
+    copy[6] = '8';
+    if (!xx_dex_legacy_analyze(copy, size, legacy)) cx_out_of_memory();
+    free(copy);
+}
+
 /* One scan: the legacy module state for this buffer, then the rules. */
 static YRX_RESULT cx_run_scan(cx_scanner *scanner, YRX_SCANNER *yrx, const uint8_t *data, size_t size,
                               const xx_dex_legacy *legacy, cx_match_list *out)
@@ -489,6 +507,7 @@ static bool cx_match_data(cx_scanner *scanner, const uint8_t *data, size_t size,
         return false;
     }
     if (!xx_dex_legacy_analyze(data, size, &legacy)) cx_out_of_memory();
+    if (!legacy.parsed && scanner->options->dex_all_versions) cx_newer_dex_analyze(data, size, &legacy);
     result = cx_run_scan(scanner, scanner->yrx, data, size, &legacy, out);
     if (result == YRX_SUCCESS) {
         if (scanner->record && scanner->log) {

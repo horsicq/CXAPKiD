@@ -52,6 +52,7 @@ typedef struct cx_options {
     cx_name_set print_exclude;
     const char *rules_dir;       /* NULL: the rules/ folder next to the executable */
     int64_t threads;             /* ZIP members scanned in parallel; <= 0 auto */
+    bool dex_all_versions;       /* the dex module also parses DEX 039 and newer (APKiD's does not) */
 } cx_options;
 
 /* Messages of one parallel task, written out in member order afterwards so

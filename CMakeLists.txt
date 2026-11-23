@@ -38,7 +38,23 @@ endif()
 
 # xxyara builds the focused set of xxfclib components its scanner needs.
 # The application owns its console; dependency tools and tests stay disabled.
+# CXAPKID_NO_CRT (MSVC x64, where it is the default): link cxapkid without the
+# Microsoft C runtime, on xxfclib's own (xxfclib docs/CRT.md), so that
+# KERNEL32.dll is its only import.
+set(_cxapkid_no_crt_default OFF)
+if(CXAPKID_MSVC_ARCH STREQUAL "x64")
+    set(_cxapkid_no_crt_default ON)
+endif()
+option(CXAPKID_NO_CRT "Link cxapkid with xxfclib's C runtime instead of Microsoft's (MSVC x64)"
+    ${_cxapkid_no_crt_default})
+if(CXAPKID_NO_CRT AND NOT CXAPKID_MSVC_ARCH)
+    message(FATAL_ERROR "CXAPKID_NO_CRT needs MSVC for x64 or x86")
+endif()
+
 function(cxapkid_add_dependencies)
+    if(CXAPKID_NO_CRT)
+        set(XXYARA_NO_CRT ON CACHE BOOL "xxyara and xxfclib without the Microsoft C runtime" FORCE)
+    endif()
     set(XXYARA_BUILD_CLI OFF CACHE BOOL "Build the dependency console" FORCE)
     set(XXYARA_BUILD_TESTS OFF CACHE BOOL "Build the dependency tests" FORCE)
     set(XXYARA_XXFCLIB_SOURCE_DIR "${CXAPKID_XXFCLIB_DIR}" CACHE PATH "xxfclib used by xxyara" FORCE)
@@ -165,6 +181,13 @@ foreach(_program IN LISTS _cxapkid_programs)
         # Complex rule conditions need more than Windows' default 1 MiB stack.
         target_link_options(${_program} PRIVATE /STACK:8388608)
         target_compile_definitions(${_program} PRIVATE _CRT_SECURE_NO_WARNINGS)
+        if(CXAPKID_NO_CRT)
+            # As xxyara does for its own programs: no security cookie, no
+            # default library records, xxfclib's runtime under the standard names.
+            target_compile_options(${_program} PRIVATE /GS- /Zl)
+            target_link_libraries(${_program} PRIVATE xxfclib::crt)
+            target_link_options(${_program} PRIVATE /NODEFAULTLIB /IGNORE:4210)
+        endif()
     else()
         target_compile_options(${_program} PRIVATE -Wall -Wextra -Wpedantic)
         if(WIN32)

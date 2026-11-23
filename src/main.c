@@ -36,7 +36,8 @@ typedef enum cx_option_id {
     OPT_PRINT_FILTER,
     OPT_INCLUDE_TYPES,
     OPT_RULES_DIR,
-    OPT_THREADS
+    OPT_THREADS,
+    OPT_DEX_ALL_VERSIONS
 } cx_option_id;
 
 typedef struct cx_option_def {
@@ -65,6 +66,7 @@ static const cx_option_def cx_option_defs[] = {
     {NULL, "--include-types", NULL, OPT_INCLUDE_TYPES, true},
     {NULL, "--rules-dir", "DIR", OPT_RULES_DIR, false},
     {NULL, "--threads", "N", OPT_THREADS, false},
+    {NULL, "--dex-all-versions", NULL, OPT_DEX_ALL_VERSIONS, false},
     {"-V", "--version", NULL, OPT_VERSION, false},
 };
 #define CX_OPTION_COUNT (sizeof(cx_option_defs) / sizeof(cx_option_defs[0]))
@@ -97,7 +99,7 @@ static const char cx_usage[] =
     "usage: " CX_PROG " [-h] [-v] [-t TIMEOUT] [-r] [--scan-depth SCAN_DEPTH]\n"
     "               [--entry-max-scan-size ENTRY_MAX_SCAN_SIZE] [--typing {magic,filename,none}] [-st]\n"
     "               [-j] [-o DIR] [-m] [--print-filter RULES] [--include-types] [--rules-dir DIR]\n"
-    "               [--threads N] [-V]\n"
+    "               [--threads N] [--dex-all-versions] [-V]\n"
     "               [FILE ...]\n";
 
 static void cx_help(void)
@@ -146,6 +148,8 @@ static void cx_help(void)
           "  --threads N                                  files or ZIP members scanned in parallel; the\n"
           "                                               output is the same; 0 = one per CPU, at most 8\n"
           "                                               (default: 0)\n"
+          "  --dex-all-versions                           let the dex module parse DEX 039 and newer; APKiD\n"
+          "                                               reports those as yara_issue (default: False)\n"
           "  -V, --version                               show the version and exit\n",
           stdout);
 }
@@ -418,6 +422,7 @@ static int cx_apply_option(cx_args *args, const cx_option_def *def, const char *
     case OPT_JSON: options->json = true; break;
     case OPT_PRINT_MATCHES: args->print_matches = true; break;
     case OPT_INCLUDE_TYPES: options->include_types = true; break;
+    case OPT_DEX_ALL_VERSIONS: options->dex_all_versions = true; break;
     case OPT_OUTPUT_DIR: options->output_dir = value; break;
     case OPT_PRINT_FILTER: args->print_filter = value; break;
     case OPT_RULES_DIR: options->rules_dir = value; break;
@@ -819,7 +824,8 @@ static void cx_dump_args(const cx_args *args)
         cx_json_string(&out, options->rules_dir);
     else
         cx_buf_puts(&out, "null");
-    cx_buf_printf(&out, ", \"threads\": %lld}\n", (long long)options->threads);
+    cx_buf_printf(&out, ", \"threads\": %lld, \"dex_all_versions\": %s}\n", (long long)options->threads,
+                  options->dex_all_versions ? "true" : "false");
     fputs(out.data, stdout);
     cx_buf_free(&out);
 }
