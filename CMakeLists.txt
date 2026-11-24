@@ -181,6 +181,11 @@ foreach(_program IN LISTS _cxapkid_programs)
         # Complex rule conditions need more than Windows' default 1 MiB stack.
         target_link_options(${_program} PRIVATE /STACK:8388608)
         target_compile_definitions(${_program} PRIVATE _CRT_SECURE_NO_WARNINGS)
+        if(CXAPKID_MSVC_ARCH STREQUAL "x86")
+            # 4 GiB of address space on 64-bit Windows instead of 2 GiB:
+            # large APKs are read into memory by several threads at once.
+            target_link_options(${_program} PRIVATE /LARGEADDRESSAWARE)
+        endif()
         if(CXAPKID_NO_CRT)
             # As xxyara does for its own programs: no security cookie, no
             # default library records, xxfclib's runtime under the standard names.
@@ -193,6 +198,10 @@ foreach(_program IN LISTS _cxapkid_programs)
         if(WIN32)
             # Same 8 MiB stack as the MSVC build (ld's default is 2 MiB).
             target_link_options(${_program} PRIVATE -Wl,--stack,8388608)
+            if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+                # As the MSVC x86 build: 4 GiB of address space on 64-bit Windows.
+                target_link_options(${_program} PRIVATE -Wl,--large-address-aware)
+            endif()
         endif()
     endif()
 endforeach()
