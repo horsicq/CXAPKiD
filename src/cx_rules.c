@@ -156,8 +156,7 @@ static bool cx_rules_selected(const char *name, bool include_trackers)
     if (!cx_ends_with_nocase(name, ".yara")) return false;
     const char *base = strrchr(name, '/');
     base = base ? base + 1 : name;
-    if (!include_trackers && cx_ends_with_nocase(base, "trackers.yara") && strlen(base) == strlen("trackers.yara"))
-        return false;
+    if (!include_trackers && cx_ends_with_nocase(base, "trackers.yara") && strlen(base) == strlen("trackers.yara")) return false;
     return true;
 }
 
@@ -207,8 +206,7 @@ static size_t cx_rules_skip_components(const char *path, size_t from, unsigned c
 
 static bool cx_rules_drive(const char *path)
 {
-    return ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z')) && path[1] == ':' &&
-           path[2] == '/';
+    return ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z')) && path[1] == ':' && path[2] == '/';
 }
 
 /* A path with '/' separators and "." / ".." collapsed, keeping its root:
@@ -225,10 +223,8 @@ static char *cx_rules_canonical(const char *path)
     size_t root = 0;
     if (copy[0] == '/' && copy[1] == '/' && (copy[2] == '?' || copy[2] == '.') && copy[3] == '/') {
         root = 4;
-        if (strncmp(copy + 4, "UNC/", 4) == 0)
-            root = cx_rules_skip_components(copy, 8, 2); /* //?/UNC/server/share/ */
-        else if (cx_rules_drive(copy + 4))
-            root = 7; /* //?/C:/ */
+        if (strncmp(copy + 4, "UNC/", 4) == 0) root = cx_rules_skip_components(copy, 8, 2); /* //?/UNC/server/share/ */
+        else if (cx_rules_drive(copy + 4)) root = 7;                                        /* //?/C:/ */
     } else if (copy[0] == '/' && copy[1] == '/') {
         root = cx_rules_skip_components(copy, 2, 2); /* //server/share/ */
     } else if (cx_rules_drive(copy)) {
@@ -409,11 +405,9 @@ static bool cx_rules_expand(cx_source_set *set, size_t index, cx_buf *out, unsig
             continue;
         }
         size_t start = position++;
-        while (position < size && (cx_rules_identifier_start((unsigned char)text[position]) ||
-                                   (text[position] >= '0' && text[position] <= '9'))) ++position;
+        while (position < size && (cx_rules_identifier_start((unsigned char)text[position]) || (text[position] >= '0' && text[position] <= '9'))) ++position;
         char *include = NULL;
-        if (position - start == 7 && memcmp(text + start, "include", 7) == 0 &&
-            cx_rules_include_path(text, size, &position, &include)) {
+        if (position - start == 7 && memcmp(text + start, "include", 7) == 0 && cx_rules_include_path(text, size, &position, &include)) {
             cx_buf_append(out, text + copied, start - copied);
             cx_source *target = cx_rules_resolve(set, &set->items[index], include, error);
             free(include);
@@ -535,8 +529,7 @@ bool cx_rules_load(cx_rules *rules, const char *rules_dir, bool include_trackers
             cx_buf_free(&source);
             goto done;
         }
-        if (yrx_compiler_new_namespace(compiler, name) != YRX_SUCCESS ||
-            yrx_compiler_add_source_with_origin(compiler, source.data, name) != YRX_SUCCESS) {
+        if (yrx_compiler_new_namespace(compiler, name) != YRX_SUCCESS || yrx_compiler_add_source_with_origin(compiler, source.data, name) != YRX_SUCCESS) {
             const char *message = yrx_last_error();
             *error = cx_format("%s: %s", name, message && *message ? message : "compilation failed");
             cx_buf_free(&source);

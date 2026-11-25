@@ -33,19 +33,19 @@ typedef struct cx_color {
  * obfuscator 93, dropper 92, embedded 94, file_type 33, internal 35); the
  * 256-color ones (tracker 208, the file name's background 240) exactly. */
 static const cx_color cx_colors[] = {
-    {0x585858U, CX_UNSET},  /* 0: unused as a foreground */
-    {0x00FFFFU, CX_UNSET},  /* 1 compiler */
-    {0x008080U, CX_UNSET},  /* 2 manipulator */
-    {0xFFFFFFU, CX_UNSET},  /* 3 abnormal */
-    {0x800080U, CX_UNSET},  /* 4 anti_vm, anti_disassembly, anti_debug, anti_root */
-    {0x800000U, CX_UNSET},  /* 5 packer, protector, anticheat */
-    {0x808000U, CX_UNSET},  /* 6 obfuscator */
-    {0x008000U, CX_UNSET},  /* 7 dropper */
-    {0x000080U, CX_UNSET},  /* 8 embedded */
-    {0xFFFF00U, CX_UNSET},  /* 9 file_type */
-    {0xFF00FFU, CX_UNSET},  /* 10 internal */
-    {0xFF8700U, CX_UNSET},  /* 11 tracker */
-    {CX_UNSET, 0x585858U},  /* 12 file name (background) */
+    {0x585858U, CX_UNSET}, /* 0: unused as a foreground */
+    {0x00FFFFU, CX_UNSET}, /* 1 compiler */
+    {0x008080U, CX_UNSET}, /* 2 manipulator */
+    {0xFFFFFFU, CX_UNSET}, /* 3 abnormal */
+    {0x800080U, CX_UNSET}, /* 4 anti_vm, anti_disassembly, anti_debug, anti_root */
+    {0x800000U, CX_UNSET}, /* 5 packer, protector, anticheat */
+    {0x808000U, CX_UNSET}, /* 6 obfuscator */
+    {0x008000U, CX_UNSET}, /* 7 dropper */
+    {0x000080U, CX_UNSET}, /* 8 embedded */
+    {0xFFFF00U, CX_UNSET}, /* 9 file_type */
+    {0xFF00FFU, CX_UNSET}, /* 10 internal */
+    {0xFF8700U, CX_UNSET}, /* 11 tracker */
+    {CX_UNSET, 0x585858U}, /* 12 file name (background) */
 };
 #define CX_COLOR_KEY 12
 
@@ -58,9 +58,7 @@ static int cx_tag_color(const char *tag)
     if (strcmp(tag, "compiler") == 0) return 1;
     if (strcmp(tag, "manipulator") == 0) return 2;
     if (strcmp(tag, "abnormal") == 0) return 3;
-    if (strcmp(tag, "anti_vm") == 0 || strcmp(tag, "anti_disassembly") == 0 || strcmp(tag, "anti_debug") == 0 ||
-        strcmp(tag, "anti_root") == 0)
-        return 4;
+    if (strcmp(tag, "anti_vm") == 0 || strcmp(tag, "anti_disassembly") == 0 || strcmp(tag, "anti_debug") == 0 || strcmp(tag, "anti_root") == 0) return 4;
     if (strcmp(tag, "packer") == 0 || strcmp(tag, "protector") == 0 || strcmp(tag, "anticheat") == 0) return 5;
     if (strcmp(tag, "obfuscator") == 0) return 6;
     if (strcmp(tag, "dropper") == 0) return 7;
@@ -109,10 +107,8 @@ static void cx_print_marked(const char *text)
         }
         if (run.length) {
             if (color >= 0)
-                (void)xx_terminal_write_color_ex(&cx_terminal, run.data, run.length, cx_colors[color].foreground,
-                                                 cx_colors[color].background, XX_TERMINAL_COLOR_EXACT);
-            else
-                (void)xx_terminal_write(&cx_terminal, run.data, run.length);
+                (void)xx_terminal_write_color_ex(&cx_terminal, run.data, run.length, cx_colors[color].foreground, cx_colors[color].background, XX_TERMINAL_COLOR_EXACT);
+            else (void)xx_terminal_write(&cx_terminal, run.data, run.length);
             run.length = 0;
         }
         if (end || p[1] == '\0') break;
@@ -150,7 +146,7 @@ void cx_output_finish(cx_output *output)
 /* ------------------------------------------------- _build_match_results() */
 
 typedef struct cx_group {
-    char *tags; /* ', '.join(sorted(m.tags)) */
+    char *tags;                    /* ', '.join(sorted(m.tags)) */
     const cx_match **descriptions; /* the matches whose description is listed */
     size_t count;
 } cx_group;
@@ -187,12 +183,9 @@ static bool cx_same_description(const cx_match *a, const cx_match *b)
 /* json.dumps() of a description: a string, a number, or true/false. */
 static void cx_json_description(cx_buf *out, const cx_match *match)
 {
-    if (!match->description || match->description_kind == CX_DESCRIPTION_TEXT)
-        cx_json_string(out, cx_description_text(match));
-    else if (match->description_kind == CX_DESCRIPTION_BOOLEAN)
-        cx_buf_puts(out, match->description_number ? "true" : "false");
-    else
-        cx_buf_printf(out, "%lld", (long long)match->description_number);
+    if (!match->description || match->description_kind == CX_DESCRIPTION_TEXT) cx_json_string(out, cx_description_text(match));
+    else if (match->description_kind == CX_DESCRIPTION_BOOLEAN) cx_buf_puts(out, match->description_number ? "true" : "false");
+    else cx_buf_printf(out, "%lld", (long long)match->description_number);
 }
 
 static void cx_build_groups(const cx_options *options, const cx_match_list *matches, cx_groups *groups)
@@ -223,8 +216,7 @@ static void cx_build_groups(const cx_options *options, const cx_match_list *matc
         bool seen = false;
         for (size_t d = 0; d < group->count && !seen; ++d) seen = cx_same_description(group->descriptions[d], match);
         if (!seen) {
-            group->descriptions =
-                (const cx_match **)cx_realloc((void *)group->descriptions, (group->count + 1) * sizeof(cx_match *));
+            group->descriptions = (const cx_match **)cx_realloc((void *)group->descriptions, (group->count + 1) * sizeof(cx_match *));
             group->descriptions[group->count++] = match;
         }
     }
@@ -266,14 +258,14 @@ void cx_json_string(cx_buf *out, const char *text)
         if (code_point < 0) code_point = 0xDC00 + p[i];
         i += used;
         switch (code_point) {
-        case '"': cx_buf_puts(out, "\\\""); continue;
-        case '\\': cx_buf_puts(out, "\\\\"); continue;
-        case '\n': cx_buf_puts(out, "\\n"); continue;
-        case '\r': cx_buf_puts(out, "\\r"); continue;
-        case '\t': cx_buf_puts(out, "\\t"); continue;
-        case '\b': cx_buf_puts(out, "\\b"); continue;
-        case '\f': cx_buf_puts(out, "\\f"); continue;
-        default: break;
+            case '"': cx_buf_puts(out, "\\\""); continue;
+            case '\\': cx_buf_puts(out, "\\\\"); continue;
+            case '\n': cx_buf_puts(out, "\\n"); continue;
+            case '\r': cx_buf_puts(out, "\\r"); continue;
+            case '\t': cx_buf_puts(out, "\\t"); continue;
+            case '\b': cx_buf_puts(out, "\\b"); continue;
+            case '\f': cx_buf_puts(out, "\\f"); continue;
+            default: break;
         }
         if (code_point >= 0x20 && code_point <= 0x7E) {
             cx_buf_putc(out, (char)code_point);
@@ -372,10 +364,8 @@ static void cx_render_console(cx_output *output, const cx_results *results, cx_b
                     size_t length = end ? (size_t)(end - tag) : strlen(tag);
                     char *name = cx_strndup(tag, length);
                     int color = cx_tag_color(name);
-                    if (color)
-                        cx_buf_put_colored(out, color, name);
-                    else
-                        cx_buf_put_text(out, name);
+                    if (color) cx_buf_put_colored(out, color, name);
+                    else cx_buf_put_text(out, name);
                     free(name);
                     if (!end) break;
                     cx_buf_puts(out, ", ");
@@ -387,10 +377,8 @@ static void cx_render_console(cx_output *output, const cx_results *results, cx_b
             cx_buf_puts(out, " : ");
             for (size_t d = 0; d < group->count; ++d) {
                 if (d) cx_buf_puts(out, ", ");
-                if (output->colorize)
-                    cx_buf_put_text(out, cx_description_text(group->descriptions[d]));
-                else
-                    cx_buf_puts(out, cx_description_text(group->descriptions[d]));
+                if (output->colorize) cx_buf_put_text(out, cx_description_text(group->descriptions[d]));
+                else cx_buf_puts(out, cx_description_text(group->descriptions[d]));
             }
             cx_buf_putc(out, '\n');
         }
@@ -416,8 +404,7 @@ static char *cx_output_path(const char *output_dir, const char *base_file)
 #ifdef _WIN32
         /* Win32 normalizes trailing dots/spaces and interprets colons as
            drives or alternate streams, so do not allow those aliases. */
-        if (!skip && (part[length - 1] == '.' || part[length - 1] == ' ' || memchr(part, ':', length)))
-            invalid = true;
+        if (!skip && (part[length - 1] == '.' || part[length - 1] == ' ' || memchr(part, ':', length))) invalid = true;
 #endif
         if (invalid) {
             free(path);
@@ -490,10 +477,8 @@ void cx_output_write(cx_output *output, const cx_results *results, cx_log *log)
         }
         size_t start = text.length;
         cx_render_console(output, results, &text);
-        if (text.length > start)
-            cx_log_emit(log, 1, cx_buf_detach(&text));
-        else
-            cx_buf_free(&text);
+        if (text.length > start) cx_log_emit(log, 1, cx_buf_detach(&text));
+        else cx_buf_free(&text);
     }
 }
 
@@ -564,18 +549,12 @@ static void cx_bytes_repr(cx_buf *out, const uint8_t *data, size_t length)
     cx_buf_putc(out, quote);
     for (size_t i = 0; i < length; ++i) {
         uint8_t c = data[i];
-        if (c == (uint8_t)quote || c == '\\')
-            cx_buf_printf(out, "\\%c", c);
-        else if (c == '\t')
-            cx_buf_puts(out, "\\t");
-        else if (c == '\n')
-            cx_buf_puts(out, "\\n");
-        else if (c == '\r')
-            cx_buf_puts(out, "\\r");
-        else if (c < 0x20 || c >= 0x7F)
-            cx_buf_printf(out, "\\x%02x", c);
-        else
-            cx_buf_putc(out, (char)c);
+        if (c == (uint8_t)quote || c == '\\') cx_buf_printf(out, "\\%c", c);
+        else if (c == '\t') cx_buf_puts(out, "\\t");
+        else if (c == '\n') cx_buf_puts(out, "\\n");
+        else if (c == '\r') cx_buf_puts(out, "\\r");
+        else if (c < 0x20 || c >= 0x7F) cx_buf_printf(out, "\\x%02x", c);
+        else cx_buf_putc(out, (char)c);
     }
     cx_buf_putc(out, quote);
 }
@@ -585,9 +564,7 @@ void cx_output_format_matches(const cx_options *options, const char *name, const
     if (!options->print_matches) return;
     for (size_t i = 0; i < matches->count; ++i) {
         const cx_match *match = &matches->items[i];
-        if (cx_name_in(&options->print_exclude, match->rule) ||
-            (options->print_include.count && !cx_name_in(&options->print_include, match->rule)))
-            continue;
+        if (cx_name_in(&options->print_exclude, match->rule) || (options->print_include.count && !cx_name_in(&options->print_include, match->rule))) continue;
         cx_buf_printf(out, "[%s] in '%s':", match->rule, name);
         for (size_t s = 0; s < match->string_count; ++s) {
             const cx_string_match *string = &match->strings[s];

@@ -46,10 +46,13 @@ typedef enum cx_file_type {
 static cx_file_type cx_type_file(const uint8_t *data, size_t size)
 {
     if (size < 4) return CX_FILE_UNKNOWN;
-    if (memcmp(data, "PK\x03\x04", 4) == 0 || memcmp(data, "PK\x05\x06", 4) == 0 || memcmp(data, "PK\x07\x08", 4) == 0)
-        return CX_FILE_ZIP;
+    if (memcmp(data, "PK\x03\x04", 4) == 0 || memcmp(data, "PK\x05\x06", 4) == 0 || memcmp(data, "PK\x07\x08", 4) == 0) return CX_FILE_ZIP;
     if (memcmp(data, "dex\n", 4) == 0 || memcmp(data, "dey\n", 4) == 0) return CX_FILE_DEX;
-    if (memcmp(data, "\x7f" "ELF", 4) == 0) return CX_FILE_ELF;
+    if (memcmp(data,
+               "\x7f"
+               "ELF",
+               4) == 0)
+        return CX_FILE_ELF;
     if (memcmp(data, "\x02\x00\x0c\x00", 4) == 0) return CX_FILE_RES;
     if (memcmp(data, "MZ\x90\x00", 4) == 0) return CX_FILE_DLL;
     return CX_FILE_UNKNOWN;
@@ -59,17 +62,13 @@ static cx_file_type cx_type_file(const uint8_t *data, size_t size)
 static bool cx_should_scan(const cx_scanner *scanner, const uint8_t *data, size_t size, const char *name)
 {
     switch (scanner->options->typing) {
-    case CX_TYPING_MAGIC:
-        return cx_type_file(data, size) != CX_FILE_UNKNOWN;
-    case CX_TYPING_FILENAME:
-        /* APKiD also tests name.lower().startswith('AndroidManifest.xml'),
-           which can never be true; it is left out on purpose. */
-        return cx_starts_with_nocase(name, "classes") || cx_starts_with_nocase(name, "lib/") ||
-               cx_ends_with_nocase(name, ".so") || cx_ends_with_nocase(name, ".dex") ||
-               cx_ends_with_nocase(name, ".apk") || cx_ends_with_nocase(name, ".arsc") ||
-               cx_ends_with_nocase(name, ".dll");
-    default:
-        return true;
+        case CX_TYPING_MAGIC: return cx_type_file(data, size) != CX_FILE_UNKNOWN;
+        case CX_TYPING_FILENAME:
+            /* APKiD also tests name.lower().startswith('AndroidManifest.xml'),
+               which can never be true; it is left out on purpose. */
+            return cx_starts_with_nocase(name, "classes") || cx_starts_with_nocase(name, "lib/") || cx_ends_with_nocase(name, ".so") ||
+                   cx_ends_with_nocase(name, ".dex") || cx_ends_with_nocase(name, ".apk") || cx_ends_with_nocase(name, ".arsc") || cx_ends_with_nocase(name, ".dll");
+        default: return true;
     }
 }
 
@@ -224,7 +223,7 @@ typedef struct cx_namespaces {
     size_t *lengths;
     size_t count;
     bool contiguous; /* each namespace's rules are one run of declarations */
-    size_t *order;    /* first matches in input order, shared only with the flusher */
+    size_t *order;   /* first matches in input order, shared only with the flusher */
     size_t next;
 } cx_namespaces;
 
@@ -244,9 +243,7 @@ static void cx_on_rule_namespace(const YRX_RULE *rule, void *user_data)
         table->contiguous = false;
         return;
     }
-    if (table->count && table->lengths[table->count - 1] == length &&
-        memcmp(table->names[table->count - 1], name, length) == 0)
-        return;
+    if (table->count && table->lengths[table->count - 1] == length && memcmp(table->names[table->count - 1], name, length) == 0) return;
     if (cx_namespace_find(table, name, length) != SIZE_MAX) {
         table->contiguous = false; /* a namespace resumed after another one */
         return;
@@ -324,14 +321,11 @@ static void cx_on_matching_rule(const YRX_RULE *rule, void *user_data)
     match = &list->items[list->count++];
     memset(match, 0, sizeof(*match));
     match->ns = SIZE_MAX;
-    if (scanner->namespaces && yrx_rule_namespace(rule, &identifier, &length) == YRX_SUCCESS)
-        match->ns = cx_namespace_find(scanner->namespaces, identifier, length);
+    if (scanner->namespaces && yrx_rule_namespace(rule, &identifier, &length) == YRX_SUCCESS) match->ns = cx_namespace_find(scanner->namespaces, identifier, length);
     identifier = NULL;
     length = 0;
-    if (yrx_rule_identifier(rule, &identifier, &length) == YRX_SUCCESS)
-        match->rule = cx_strndup((const char *)identifier, length);
-    else
-        match->rule = cx_strdup("");
+    if (yrx_rule_identifier(rule, &identifier, &length) == YRX_SUCCESS) match->rule = cx_strndup((const char *)identifier, length);
+    else match->rule = cx_strdup("");
     yrx_rule_iter_tags(rule, cx_on_tag, match);
     if (match->tag_count > 1) qsort(match->tags, match->tag_count, sizeof(char *), cx_compare_strings);
     yrx_rule_iter_metadata(rule, cx_on_metadata, match);
@@ -345,7 +339,11 @@ static void cx_on_matching_rule(const YRX_RULE *rule, void *user_data)
  * when the data is longer than the ELF header (`block->size > sizeof`). */
 static bool cx_legacy_elf_rejects(const uint8_t *data, size_t size)
 {
-    if (size < 4 || memcmp(data, "\x7f" "ELF", 4) != 0) return false;
+    if (size < 4 || memcmp(data,
+                           "\x7f"
+                           "ELF",
+                           4) != 0)
+        return false;
     if (size < 16 || (data[5] != 1 && data[5] != 2)) return true;
     if (data[4] == 1) return size <= 52;
     if (data[4] == 2) return size <= 64;
@@ -394,8 +392,7 @@ static void cx_newer_dex_analyze(const uint8_t *data, size_t size, xx_dex_legacy
 }
 
 /* One scan: the legacy module state for this buffer, then the rules. */
-static YRX_RESULT cx_run_scan(cx_scanner *scanner, YRX_SCANNER *yrx, const uint8_t *data, size_t size,
-                              const xx_dex_legacy *legacy, cx_match_list *out)
+static YRX_RESULT cx_run_scan(cx_scanner *scanner, YRX_SCANNER *yrx, const uint8_t *data, size_t size, const xx_dex_legacy *legacy, cx_match_list *out)
 {
     static const uint8_t empty[1] = {0};
     YRX_RESULT result;
@@ -425,7 +422,7 @@ static YRX_RESULT cx_run_scan(cx_scanner *scanner, YRX_SCANNER *yrx, const uint8
 typedef struct cx_scan_record {
     size_t *namespaces; /* ascending */
     size_t count;
-    char *key;          /* a print: the key and a copy of the matches */
+    char *key; /* a print: the key and a copy of the matches */
     cx_match_list matches;
 } cx_scan_record;
 
@@ -518,10 +515,8 @@ static bool cx_match_data(cx_scanner *scanner, const uint8_t *data, size_t size,
         return true;
     }
     cx_match_list_free(out);
-    if (result == YRX_SCAN_TIMEOUT)
-        *error = cx_strdup("Scanning timed out");
-    else
-        *error = cx_strdup(yrx_last_error() && *yrx_last_error() ? yrx_last_error() : "scan error");
+    if (result == YRX_SCAN_TIMEOUT) *error = cx_strdup("Scanning timed out");
+    else *error = cx_strdup(yrx_last_error() && *yrx_last_error() ? yrx_last_error() : "scan error");
     return false;
 }
 
@@ -533,8 +528,7 @@ static void cx_report(cx_scanner *scanner, const char *what, const char *message
     cx_log_emit(scanner->log, 2, cx_format("Exception scanning %s: %s\n", what, message));
 }
 
-static void cx_report_entry(cx_scanner *scanner, const xx_zip_py_info *info, const char *prefix, int64_t depth,
-                            const char *message)
+static void cx_report_entry(cx_scanner *scanner, const xx_zip_py_info *info, const char *prefix, int64_t depth, const char *message)
 {
     char *what = cx_format("%s in %s, depth=%lld", info->filename, prefix, (long long)depth);
     cx_report(scanner, what, message ? message : "error");
@@ -545,8 +539,7 @@ static void cx_report_entry(cx_scanner *scanner, const xx_zip_py_info *info, con
 static void cx_report_warnings(cx_scanner *scanner, const xx_zip_py *zip)
 {
     if (!scanner->options->verbose) return;
-    for (size_t i = 0; i < zip->warning_count; ++i)
-        cx_log_emit(scanner->log, 2, cx_format("UserWarning: %s\n", zip->warnings[i]));
+    for (size_t i = 0; i < zip->warning_count; ++i) cx_log_emit(scanner->log, 2, cx_format("UserWarning: %s\n", zip->warnings[i]));
 }
 
 static void cx_print_found(cx_scanner *scanner, const char *key, const cx_match_list *matches)
@@ -564,10 +557,8 @@ static void cx_print_found(cx_scanner *scanner, const char *key, const cx_match_
         return;
     }
     cx_output_format_matches(scanner->options, key, matches, &text);
-    if (text.length)
-        cx_log_emit(scanner->log, 1, cx_buf_detach(&text));
-    else
-        cx_buf_free(&text);
+    if (text.length) cx_log_emit(scanner->log, 1, cx_buf_detach(&text));
+    else cx_buf_free(&text);
 }
 
 static void cx_scan_zip(cx_scanner *scanner, const xx_zip_py *zip, int64_t depth, const char *prefix, cx_results *results);
@@ -575,15 +566,14 @@ static void cx_scan_zip(cx_scanner *scanner, const xx_zip_py *zip, int64_t depth
 /* A member job of a parallel run that may hand its nested archive's members
  * to other threads (see cx_pool_spawn). */
 typedef struct cx_spawn cx_spawn;
-static bool cx_pool_spawn(cx_scanner *scanner, cx_spawn *spawn, const xx_zip_py_info *info, const char *prefix, uint8_t *data,
-                          size_t size, xx_zip_py_owner owner);
+static bool cx_pool_spawn(cx_scanner *scanner, cx_spawn *spawn, const xx_zip_py_info *info, const char *prefix, uint8_t *data, size_t size, xx_zip_py_owner owner);
 
 /* Scanner._scan_zip_entry(). With `spawn`, a member that is an archive to
  * scan may continue as jobs of the parallel run: then the rules over the
  * member and each nested member are separate jobs, written out in the same
  * order as here. */
-static void cx_scan_zip_entry(cx_scanner *scanner, const xx_zip_py *zip, const xx_zip_py_info *info, int64_t depth,
-                              const char *prefix, cx_results *results, cx_spawn *spawn)
+static void cx_scan_zip_entry(cx_scanner *scanner, const xx_zip_py *zip, const xx_zip_py_info *info, int64_t depth, const char *prefix, cx_results *results,
+                              cx_spawn *spawn)
 {
     const cx_options *options = scanner->options;
     uint64_t data_offset = 0;
@@ -609,9 +599,7 @@ static void cx_scan_zip_entry(cx_scanner *scanner, const xx_zip_py *zip, const x
         xx_zip_py_free_text(warning);
     }
     if (status == XX_ZIP_PY_OVERLAPPED) {
-        if (options->verbose)
-            cx_log_emit(scanner->log, 1,
-                        cx_format("[W] Skipping overlapped entry %s (possible zip bomb)\n", info->filename));
+        if (options->verbose) cx_log_emit(scanner->log, 1, cx_format("[W] Skipping overlapped entry %s (possible zip bomb)\n", info->filename));
         xx_zip_py_free_text(error);
         return;
     }
@@ -619,9 +607,7 @@ static void cx_scan_zip_entry(cx_scanner *scanner, const xx_zip_py *zip, const x
         xx_zip_py_free_text(error);
         error = NULL;
         if (info->compress_type != XX_ZIP_PY_XZ) {
-            cx_log_emit(scanner->log, 1,
-                        cx_format("[E] Unsupported compression method %u for %s\n", (unsigned)info->compress_type,
-                                  info->filename));
+            cx_log_emit(scanner->log, 1, cx_format("[E] Unsupported compression method %u for %s\n", (unsigned)info->compress_type, info->filename));
             return;
         }
         /* XZ: APKiD decompresses the raw member data with lzma.decompress()
@@ -629,13 +615,11 @@ static void cx_scan_zip_entry(cx_scanner *scanner, const xx_zip_py *zip, const x
         const uint8_t *raw = NULL;
         size_t raw_size = 0;
         if (!xx_zip_py_raw_data(zip, info, &raw, &raw_size)) {
-            cx_log_emit(scanner->log, 1,
-                        cx_format("[E] Failed to decompress %s: %s\n", info->filename, "truncated local file header"));
+            cx_log_emit(scanner->log, 1, cx_format("[E] Failed to decompress %s: %s\n", info->filename, "truncated local file header"));
             return;
         }
         if (!xx_zip_py_xz_decompress(raw, raw_size, &data, &size, &error)) {
-            cx_log_emit(scanner->log, 1,
-                        cx_format("[E] Failed to decompress %s: %s\n", info->filename, error ? error : "error"));
+            cx_log_emit(scanner->log, 1, cx_format("[E] Failed to decompress %s: %s\n", info->filename, error ? error : "error"));
             xx_zip_py_free_text(error);
             return;
         }
@@ -673,8 +657,7 @@ static void cx_scan_zip_entry(cx_scanner *scanner, const xx_zip_py *zip, const x
 
     /* The nested-archive test does not depend on the rules' outcome; it is
        only made earlier here. */
-    if (spawn && depth < options->scan_depth && cx_is_zipfile(scanner, data, size, info->filename) &&
-        cx_pool_spawn(scanner, spawn, info, prefix, data, size, owner))
+    if (spawn && depth < options->scan_depth && cx_is_zipfile(scanner, data, size, info->filename) && cx_pool_spawn(scanner, spawn, info, prefix, data, size, owner))
         return; /* the spawned jobs own data now */
 
     char *key = cx_format("%s!%s", prefix, info->filename);
@@ -717,8 +700,7 @@ static void cx_scan_zip(cx_scanner *scanner, const xx_zip_py *zip, int64_t depth
 }
 
 /* The rules over a whole input file, the first step of scan_file_obj(). */
-static void cx_scan_whole(cx_scanner *scanner, const uint8_t *data, size_t size, const char *file_path,
-                          cx_results *results)
+static void cx_scan_whole(cx_scanner *scanner, const uint8_t *data, size_t size, const char *file_path, cx_results *results)
 {
     cx_match_list matches;
     char *error = NULL;
@@ -748,33 +730,33 @@ static void cx_scan_whole(cx_scanner *scanner, const uint8_t *data, size_t size,
 typedef struct cx_group {
     const xx_zip_py_info *info; /* the member */
     const char *prefix;
-    char *key;               /* prefix!member */
-    uint8_t *data;           /* the member's bytes, shared by the group */
+    char *key;     /* prefix!member */
+    uint8_t *data; /* the member's bytes, shared by the group */
     size_t size;
     xx_zip_py_owner owner;
-    xx_zip_py zip;           /* the member as an archive */
-    size_t pending;          /* jobs of the group not finished */
+    xx_zip_py zip;  /* the member as an archive */
+    size_t pending; /* jobs of the group not finished */
     bool match_failed;
 } cx_group;
 
 typedef struct cx_job {
-    const char *path;          /* file job */
+    const char *path;           /* file job */
     const xx_zip_py_info *info; /* member job (nested member in a group) */
-    bool archive;              /* the archive itself (rules.match on all of it) */
-    cx_group *group;           /* a job of a group: the rules over the member when info is NULL */
-    uint64_t cost;             /* start order: the largest first */
-    cx_results results;        /* retained until this job is written in input order */
+    bool archive;               /* the archive itself (rules.match on all of it) */
+    cx_group *group;            /* a job of a group: the rules over the member when info is NULL */
+    uint64_t cost;              /* start order: the largest first */
+    cx_results results;         /* retained until this job is written in input order */
     cx_log log;
     bool done;
-    bool merged;               /* own messages and results written out */
-    struct cx_job *children;   /* the group a member job spawned, in output order */
+    bool merged;             /* own messages and results written out */
+    struct cx_job *children; /* the group a member job spawned, in output order */
     size_t child_count;
     size_t child_flushed;
 } cx_job;
 
 typedef struct cx_pool {
     cx_job *jobs;
-    size_t *order;  /* start order: indices into jobs; NULL: job order */
+    size_t *order; /* start order: indices into jobs; NULL: job order */
     size_t count;
     size_t next;    /* first job not started (index into order) */
     size_t flushed; /* first job not written out */
@@ -790,7 +772,7 @@ typedef struct cx_pool {
     cx_results *results;
     /* Scan records replayed (see cx_pool_merge): the namespaces' order of
        first matches over the jobs written so far, by declaration index. */
-    size_t *ns_order;  /* NULL: no records */
+    size_t *ns_order; /* NULL: no records */
     size_t ns_count;
     size_t ns_next;
     const cx_options *options;
@@ -855,8 +837,7 @@ static uint64_t cx_member_cost(const xx_zip_py_info *info)
 
 /* The member's data is an archive with members: continue as a group of jobs
  * (see above). False leaves everything to the caller, unchanged. */
-static bool cx_pool_spawn(cx_scanner *scanner, cx_spawn *spawn, const xx_zip_py_info *info, const char *prefix, uint8_t *data,
-                          size_t size, xx_zip_py_owner owner)
+static bool cx_pool_spawn(cx_scanner *scanner, cx_spawn *spawn, const xx_zip_py_info *info, const char *prefix, uint8_t *data, size_t size, xx_zip_py_owner owner)
 {
     cx_pool *pool = spawn->pool;
     xx_zip_py nested;
@@ -935,8 +916,7 @@ static void cx_scan_group_match(cx_scanner *scanner, cx_group *group, cx_results
 static void cx_pool_seen(cx_pool *pool, const cx_scan_record *record)
 {
     for (size_t i = 0; i < record->count; ++i)
-        if (record->namespaces[i] < pool->ns_count && pool->ns_order[record->namespaces[i]] == SIZE_MAX)
-            pool->ns_order[record->namespaces[i]] = pool->ns_next++;
+        if (record->namespaces[i] < pool->ns_count && pool->ns_order[record->namespaces[i]] == SIZE_MAX) pool->ns_order[record->namespaces[i]] = pool->ns_next++;
 }
 
 static void cx_pool_reorder(const cx_pool *pool, cx_match_list *list)
@@ -1194,8 +1174,7 @@ static void cx_pool_run(cx_scanner *owner, cx_pool *pool, bool nested)
 }
 
 /* Scanner.scan_file_obj() */
-static void cx_scan_file_obj(cx_scanner *scanner, const uint8_t *data, size_t size, const char *file_path,
-                             cx_results *results)
+static void cx_scan_file_obj(cx_scanner *scanner, const uint8_t *data, size_t size, const char *file_path, cx_results *results)
 {
     const char *file_name = cx_path_basename(file_path);
     char *error = NULL;
@@ -1204,8 +1183,7 @@ static void cx_scan_file_obj(cx_scanner *scanner, const uint8_t *data, size_t si
        seek that io.BytesIO (and so xx_zip_py) lets pass: is_zipfile() is
        False then, and ZipFile() raises. */
     bool unseekable = xx_zip_py_file_seek_fails(data, size);
-    if (!cx_is_zipfile(scanner, data, size, file_name) ||
-        (unseekable && scanner->options->typing != CX_TYPING_FILENAME)) {
+    if (!cx_is_zipfile(scanner, data, size, file_name) || (unseekable && scanner->options->typing != CX_TYPING_FILENAME)) {
         cx_scan_whole(scanner, data, size, file_path, results);
         return;
     }
@@ -1234,8 +1212,7 @@ static void cx_scan_file_obj(cx_scanner *scanner, const uint8_t *data, size_t si
        jobs' matches can be put in the sequential order (cx_pool_merge) only
        for rules whose namespaces are contiguous and when this scanner has
        scanned nothing before; otherwise everything runs in sequence. */
-    if (!scanner->log && members > 0 && cx_thread_count(scanner->options) > 1 && !scanner->used &&
-        scanner->namespaces && scanner->namespaces->contiguous) {
+    if (!scanner->log && members > 0 && cx_thread_count(scanner->options) > 1 && !scanner->used && scanner->namespaces && scanner->namespaces->contiguous) {
         cx_pool pool;
         memset(&pool, 0, sizeof(pool));
         pool.jobs = (cx_job *)cx_calloc(members + 1, sizeof(cx_job));
@@ -1307,8 +1284,7 @@ static bool cx_list_directory(const char *path, xx_list_t *entries)
     if (!xx_list_init(entries, sizeof(xx_fs_entry_t *), NULL)) return false;
     ok = xx_fs_list_dir_sorted(path, entries, XX_FS_SORT_NAME);
 #ifdef _WIN32
-    if (xx_list_count(entries) > 1)
-        qsort(xx_list_at(entries, 0), xx_list_count(entries), sizeof(xx_fs_entry_t *), cx_compare_entries);
+    if (xx_list_count(entries) > 1) qsort(xx_list_at(entries, 0), xx_list_count(entries), sizeof(xx_fs_entry_t *), cx_compare_entries);
 #endif
     return ok;
 }
@@ -1371,8 +1347,7 @@ static bool cx_walk_directory(const char *path)
     DWORD attributes = GetFileAttributesW(api_path);
     free(extended);
     free(full);
-    return attributes != INVALID_FILE_ATTRIBUTES &&
-           (attributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) == FILE_ATTRIBUTE_DIRECTORY;
+    return attributes != INVALID_FILE_ATTRIBUTES && (attributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) == FILE_ATTRIBUTE_DIRECTORY;
 #else
     struct stat info;
     return lstat(path, &info) == 0 && S_ISDIR(info.st_mode);
@@ -1431,10 +1406,8 @@ static void cx_collect_directory(cx_scanner *scanner, const char *directory, cx_
 /* Scanner.scan() */
 static void cx_collect(cx_scanner *scanner, const char *path, cx_paths *paths)
 {
-    if (xx_fs_is_file(path))
-        cx_paths_add(paths, cx_strdup(path));
-    else if (xx_fs_is_dir(path))
-        cx_collect_directory(scanner, path, paths);
+    if (xx_fs_is_file(path)) cx_paths_add(paths, cx_strdup(path));
+    else if (xx_fs_is_dir(path)) cx_collect_directory(scanner, path, paths);
 }
 
 void cx_scanner_scan_inputs(cx_scanner *scanner, const char *const *inputs, size_t count)
@@ -1456,8 +1429,7 @@ void cx_scanner_scan_inputs(cx_scanner *scanner, const char *const *inputs, size
     free(paths.items);
 }
 
-bool cx_scanner_init(cx_scanner *scanner, const cx_options *options, const YRX_RULES *rules, cx_output *output,
-                     char **error)
+bool cx_scanner_init(cx_scanner *scanner, const cx_options *options, const YRX_RULES *rules, cx_output *output, char **error)
 {
     memset(scanner, 0, sizeof(*scanner));
     scanner->options = options;

@@ -37,28 +37,28 @@ typedef struct cx_name_set {
 } cx_name_set;
 
 typedef struct cx_options {
-    int64_t timeout;             /* seconds; <= 0 disables the limit */
+    int64_t timeout; /* seconds; <= 0 disables the limit */
     bool verbose;
     bool json;
-    const char *output_dir;      /* implies JSON */
+    const char *output_dir; /* implies JSON */
     cx_typing typing;
     int64_t entry_max_scan_size; /* accepted; unused, as in APKiD */
     int64_t scan_depth;
     bool recursive;
     bool include_trackers;
     bool include_types;
-    bool print_matches;          /* print filter active */
+    bool print_matches; /* print filter active */
     cx_name_set print_include;
     cx_name_set print_exclude;
-    const char *rules_dir;       /* NULL: the rules/ folder next to the executable */
-    int64_t threads;             /* ZIP members scanned in parallel; <= 0 auto */
-    bool dex_all_versions;       /* the dex module also parses DEX 039 and newer (APKiD's does not) */
+    const char *rules_dir; /* NULL: the rules/ folder next to the executable */
+    int64_t threads;       /* ZIP members scanned in parallel; <= 0 auto */
+    bool dex_all_versions; /* the dex module also parses DEX 039 and newer (APKiD's does not) */
 } cx_options;
 
 /* Messages of one parallel task, written out in member order afterwards so
  * the output does not depend on scheduling. */
 typedef struct cx_log_entry {
-    int stream;   /* 1 stdout, 2 stderr; 0 a scan record (cx_scan.c) */
+    int stream; /* 1 stdout, 2 stderr; 0 a scan record (cx_scan.c) */
     char *text;
     void *record; /* stream 0 */
 } cx_log_entry;
@@ -84,12 +84,12 @@ typedef enum cx_description_kind {
 } cx_description_kind;
 
 typedef struct cx_match {
-    size_t ns;         /* the rule's namespace, in declaration order */
+    size_t ns; /* the rule's namespace, in declaration order */
     char *rule;
     char *description; /* meta "description" as text (str() of it), NULL when absent */
     cx_description_kind description_kind;
     int64_t description_number; /* the value of an integer or boolean description */
-    char **tags;       /* sorted */
+    char **tags;                /* sorted */
     size_t tag_count;
     cx_string_match *strings;
     size_t string_count;
@@ -127,19 +127,18 @@ typedef struct cx_scanner {
     const uint8_t *data; /* buffer being scanned, for match data */
     size_t size;
     cx_match_list *current;
-    cx_log *log;                 /* NULL: messages go out directly */
-    struct cx_scanner *workers;  /* one per thread, created on first use */
+    cx_log *log;                /* NULL: messages go out directly */
+    struct cx_scanner *workers; /* one per thread, created on first use */
     size_t worker_count;
     struct cx_namespaces *namespaces; /* the rules' namespaces (owner's, shared) */
-    bool record;                 /* scans leave records in the log (see cx_scan.c) */
-    bool used;                   /* has scanned an input (its YARA-X scanner has a history) */
+    bool record;                      /* scans leave records in the log (see cx_scan.c) */
+    bool used;                        /* has scanned an input (its YARA-X scanner has a history) */
 } cx_scanner;
 
 void cx_match_list_free(cx_match_list *list);
 void cx_results_free(cx_results *results);
 
-bool cx_scanner_init(cx_scanner *scanner, const cx_options *options, const YRX_RULES *rules, cx_output *output,
-                     char **error);
+bool cx_scanner_init(cx_scanner *scanner, const cx_options *options, const YRX_RULES *rules, cx_output *output, char **error);
 void cx_scanner_free(cx_scanner *scanner);
 /* Scanner.scan(path) for every input: files, or every file of a directory.
  * Output is the same as scanning them one after another. */

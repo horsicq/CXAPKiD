@@ -45,7 +45,7 @@ typedef struct cx_option_def {
     const char *long_name;  /* "--timeout" */
     const char *metavar;    /* NULL for flags */
     cx_option_id id;
-    bool apkid;             /* an option of APKiD itself */
+    bool apkid; /* an option of APKiD itself */
 } cx_option_def;
 
 /* In the order APKiD adds them to its parser (messages list them so); the
@@ -95,63 +95,64 @@ static void cx_option_strings_init(void)
 }
 
 /* Wrapped at 100 columns, the width APKiD gives its help formatter. */
-static const char cx_usage[] =
-    "usage: " CX_PROG " [-h] [-v] [-t TIMEOUT] [-r] [--scan-depth SCAN_DEPTH]\n"
-    "               [--entry-max-scan-size ENTRY_MAX_SCAN_SIZE] [--typing {magic,filename,none}] [-st]\n"
-    "               [-j] [-o DIR] [-m] [--print-filter RULES] [--include-types] [--rules-dir DIR]\n"
-    "               [--threads N] [--dex-all-versions] [-V]\n"
-    "               [FILE ...]\n";
+static const char cx_usage[] = "usage: " CX_PROG
+                               " [-h] [-v] [-t TIMEOUT] [-r] [--scan-depth SCAN_DEPTH]\n"
+                               "               [--entry-max-scan-size ENTRY_MAX_SCAN_SIZE] [--typing {magic,filename,none}] [-st]\n"
+                               "               [-j] [-o DIR] [-m] [--print-filter RULES] [--include-types] [--rules-dir DIR]\n"
+                               "               [--threads N] [--dex-all-versions] [-V]\n"
+                               "               [FILE ...]\n";
 
 static void cx_help(void)
 {
     fputs(cx_usage, stdout);
-    fputs("\n"
-          "CXAPKiD - Android Application Identifier v" CXAPKID_APKID_VERSION " (C port, " CXAPKID_VERSION ")\n"
-          CXAPKID_COPYRIGHT "\n"
-          "\n"
-          "positional arguments:\n"
-          "  FILE                                         apk, dex, or directory (default: None)\n"
-          "\n"
-          "options:\n"
-          "  -h, --help                                   show this help message and exit\n"
-          "  -v, --verbose                                log debug messages (default: False)\n"
-          "\n"
-          "scanning:\n"
-          "  -t, --timeout TIMEOUT                        Yara scan timeout (in seconds) (default: 30)\n"
-          "  -r, --recursive                              recurse into subdirectories (default: False)\n"
-          "  --scan-depth SCAN_DEPTH                      how deep to go when scanning nested zips (default:\n"
-          "                                               2)\n"
-          "  --entry-max-scan-size ENTRY_MAX_SCAN_SIZE    max zip entry size to scan in bytes, 0 = no limit\n"
-          "                                               (default: 104857600)\n"
-          "  --typing {magic,filename,none}               method to decide which files to scan (default:\n"
-          "                                               magic)\n"
-          "  -st, --scan-trackers                         scans for embedded trackers (default: False)\n"
-          "\n"
-          "output:\n"
-          "  -j, --json                                   output scan results in JSON format (default:\n"
-          "                                               False)\n"
-          "  -o, --output-dir DIR                         write individual results here (implies --json)\n"
-          "                                               (default: None)\n"
-          "  -m, --print-matches                          print matched rules and strings to stdout\n"
-          "                                               (default: False)\n"
-          "  --print-filter RULES                         filter printed matches: comma-separated rule\n"
-          "                                               names to include ('+' or no prefix) or exclude\n"
-          "                                               ('-' prefix). Implies --print-matches. Use '='\n"
-          "                                               when the value starts with '-', e.g. --print-\n"
-          "                                               filter=-is_apk,-is_signed_apk (default: )\n"
-          "  --include-types                              include file type info for matched files\n"
-          "                                               (default: False)\n"
-          "\n"
-          "CXAPKiD:\n"
-          "  --rules-dir DIR                              compile the *.yara rules of DIR\n"
-          "                                               (default: rules/ beside the executable)\n"
-          "  --threads N                                  files or ZIP members scanned in parallel; the\n"
-          "                                               output is the same; 0 = one per CPU, at most 8\n"
-          "                                               (default: 0)\n"
-          "  --dex-all-versions                           let the dex module parse DEX 039 and newer; APKiD\n"
-          "                                               reports those as yara_issue (default: False)\n"
-          "  -V, --version                               show the version and exit\n",
-          stdout);
+    fputs(
+        "\n"
+        "CXAPKiD - Android Application Identifier v" CXAPKID_APKID_VERSION " (C port, " CXAPKID_VERSION ")\n" CXAPKID_COPYRIGHT
+        "\n"
+        "\n"
+        "positional arguments:\n"
+        "  FILE                                         apk, dex, or directory (default: None)\n"
+        "\n"
+        "options:\n"
+        "  -h, --help                                   show this help message and exit\n"
+        "  -v, --verbose                                log debug messages (default: False)\n"
+        "\n"
+        "scanning:\n"
+        "  -t, --timeout TIMEOUT                        Yara scan timeout (in seconds) (default: 30)\n"
+        "  -r, --recursive                              recurse into subdirectories (default: False)\n"
+        "  --scan-depth SCAN_DEPTH                      how deep to go when scanning nested zips (default:\n"
+        "                                               2)\n"
+        "  --entry-max-scan-size ENTRY_MAX_SCAN_SIZE    max zip entry size to scan in bytes, 0 = no limit\n"
+        "                                               (default: 104857600)\n"
+        "  --typing {magic,filename,none}               method to decide which files to scan (default:\n"
+        "                                               magic)\n"
+        "  -st, --scan-trackers                         scans for embedded trackers (default: False)\n"
+        "\n"
+        "output:\n"
+        "  -j, --json                                   output scan results in JSON format (default:\n"
+        "                                               False)\n"
+        "  -o, --output-dir DIR                         write individual results here (implies --json)\n"
+        "                                               (default: None)\n"
+        "  -m, --print-matches                          print matched rules and strings to stdout\n"
+        "                                               (default: False)\n"
+        "  --print-filter RULES                         filter printed matches: comma-separated rule\n"
+        "                                               names to include ('+' or no prefix) or exclude\n"
+        "                                               ('-' prefix). Implies --print-matches. Use '='\n"
+        "                                               when the value starts with '-', e.g. --print-\n"
+        "                                               filter=-is_apk,-is_signed_apk (default: )\n"
+        "  --include-types                              include file type info for matched files\n"
+        "                                               (default: False)\n"
+        "\n"
+        "CXAPKiD:\n"
+        "  --rules-dir DIR                              compile the *.yara rules of DIR\n"
+        "                                               (default: rules/ beside the executable)\n"
+        "  --threads N                                  files or ZIP members scanned in parallel; the\n"
+        "                                               output is the same; 0 = one per CPU, at most 8\n"
+        "                                               (default: 0)\n"
+        "  --dex-all-versions                           let the dex module parse DEX 039 and newer; APKiD\n"
+        "                                               reports those as yara_issue (default: False)\n"
+        "  -V, --version                               show the version and exit\n",
+        stdout);
 }
 
 /* parser.error(): the usage, then the message; exit code 2. Takes over the
@@ -183,10 +184,8 @@ static bool cx_py_is_space(int32_t code_point)
     size_t low = 0, high = sizeof(cx_py_spaces) / sizeof(cx_py_spaces[0]);
     while (low < high) {
         size_t middle = (low + high) / 2;
-        if (cx_py_spaces[middle] < (uint32_t)code_point)
-            low = middle + 1;
-        else
-            high = middle;
+        if (cx_py_spaces[middle] < (uint32_t)code_point) low = middle + 1;
+        else high = middle;
     }
     return low < sizeof(cx_py_spaces) / sizeof(cx_py_spaces[0]) && cx_py_spaces[low] == (uint32_t)code_point;
 }
@@ -199,10 +198,8 @@ static int cx_py_digit(int32_t code_point)
     /* the last run that starts at or before the code point */
     while (low < high) {
         size_t middle = (low + high) / 2;
-        if (cx_py_digit_zeros[middle] <= (uint32_t)code_point)
-            low = middle + 1;
-        else
-            high = middle;
+        if (cx_py_digit_zeros[middle] <= (uint32_t)code_point) low = middle + 1;
+        else high = middle;
     }
     if (!low || (uint32_t)code_point - cx_py_digit_zeros[low - 1] > 9) return -1;
     return (int)((uint32_t)code_point - cx_py_digit_zeros[low - 1]);
@@ -214,14 +211,10 @@ static bool cx_py_is_printable(int32_t code_point)
     if (code_point < 0x7F) return code_point >= 0x20;
     while (low < high) {
         size_t middle = (low + high) / 2;
-        if (cx_py_unprintable[middle][1] < (uint32_t)code_point)
-            low = middle + 1;
-        else
-            high = middle;
+        if (cx_py_unprintable[middle][1] < (uint32_t)code_point) low = middle + 1;
+        else high = middle;
     }
-    return code_point != 0x7F &&
-           !(low < sizeof(cx_py_unprintable) / sizeof(cx_py_unprintable[0]) &&
-             cx_py_unprintable[low][0] <= (uint32_t)code_point);
+    return code_point != 0x7F && !(low < sizeof(cx_py_unprintable) / sizeof(cx_py_unprintable[0]) && cx_py_unprintable[low][0] <= (uint32_t)code_point);
 }
 
 /* repr(text), which is how argparse quotes a value in its messages ('%r').
@@ -313,14 +306,10 @@ static bool cx_parse_int(const char *text, int64_t *value)
         int32_t code_point;
         size_t used = cx_utf8_decode(bytes + i, length - i, &code_point);
         i += used;
-        if (code_point >= 0 && code_point < 0x80)
-            cx_buf_putc(&ascii, (char)code_point);
-        else if (code_point >= 0 && cx_py_is_space(code_point))
-            cx_buf_putc(&ascii, ' ');
-        else if (code_point >= 0 && cx_py_digit(code_point) >= 0)
-            cx_buf_putc(&ascii, (char)('0' + cx_py_digit(code_point)));
-        else
-            goto done;
+        if (code_point >= 0 && code_point < 0x80) cx_buf_putc(&ascii, (char)code_point);
+        else if (code_point >= 0 && cx_py_is_space(code_point)) cx_buf_putc(&ascii, ' ');
+        else if (code_point >= 0 && cx_py_digit(code_point) >= 0) cx_buf_putc(&ascii, (char)('0' + cx_py_digit(code_point)));
+        else goto done;
     }
     p = ascii.data;
     while (*p == ' ' || (*p >= '\t' && *p <= '\r')) ++p;
@@ -329,17 +318,13 @@ static bool cx_parse_int(const char *text, int64_t *value)
         if (*p == '_' && digit_count && p[-1] != '_' && p[1] >= '0' && p[1] <= '9') continue;
         if (*p < '0' || *p > '9') break;
         ++digit_count;
-        if (result <= (UINT64_MAX - 9) / 10)
-            result = result * 10 + (uint64_t)(*p - '0');
-        else
-            result = UINT64_MAX;
+        if (result <= (UINT64_MAX - 9) / 10) result = result * 10 + (uint64_t)(*p - '0');
+        else result = UINT64_MAX;
     }
     while (*p == ' ' || (*p >= '\t' && *p <= '\r')) ++p;
     if (!digit_count || digit_count > CX_PY_INT_MAX_DIGITS || *p) goto done;
-    if (negative)
-        *value = result > (uint64_t)INT64_MAX ? INT64_MIN : -(int64_t)result;
-    else
-        *value = result > (uint64_t)INT64_MAX ? INT64_MAX : (int64_t)result;
+    if (negative) *value = result > (uint64_t)INT64_MAX ? INT64_MIN : -(int64_t)result;
+    else *value = result > (uint64_t)INT64_MAX ? INT64_MAX : (int64_t)result;
     ok = true;
 done:
     cx_buf_free(&ascii);
@@ -365,8 +350,8 @@ static void cx_parse_print_filter(cx_options *options, const char *value)
         for (size_t i = 0; i < length;) {
             int32_t code_point;
             size_t used = cx_utf8_decode((const uint8_t *)token + i, length - i, &code_point);
-            bool space = code_point == ' ' || (code_point >= '\t' && code_point <= '\r') ||
-                         (code_point >= 0x1C && code_point <= 0x1F) || (code_point >= 0x80 && cx_py_is_space(code_point));
+            bool space = code_point == ' ' || (code_point >= '\t' && code_point <= '\r') || (code_point >= 0x1C && code_point <= 0x1F) ||
+                         (code_point >= 0x80 && cx_py_is_space(code_point));
             if (!space) {
                 if (first == length) first = i;
                 last = i + used;
@@ -376,12 +361,9 @@ static void cx_parse_print_filter(cx_options *options, const char *value)
         if (first < length) {
             const char *name = token + first;
             length = last - first;
-            if (name[0] == '-')
-                cx_name_set_add(&options->print_exclude, name + 1, length - 1);
-            else if (name[0] == '+')
-                cx_name_set_add(&options->print_include, name + 1, length - 1);
-            else
-                cx_name_set_add(&options->print_include, name, length);
+            if (name[0] == '-') cx_name_set_add(&options->print_exclude, name + 1, length - 1);
+            else if (name[0] == '+') cx_name_set_add(&options->print_include, name + 1, length - 1);
+            else cx_name_set_add(&options->print_include, name, length);
         }
         if (!end) break;
         token = end + 1;
@@ -412,56 +394,52 @@ static int cx_apply_option(cx_args *args, const cx_option_def *def, const char *
     cx_options *options = &args->options;
     cx_buf message = {0};
     switch (def->id) {
-    /* argparse runs these actions as soon as they are parsed: arguments
-       after them are not looked at. */
-    case OPT_HELP: args->help = true; return -1;
-    case OPT_VERSION: args->version = true; return -1;
-    case OPT_VERBOSE: options->verbose = true; break;
-    case OPT_RECURSIVE: options->recursive = true; break;
-    case OPT_SCAN_TRACKERS: options->include_trackers = true; break;
-    case OPT_JSON: options->json = true; break;
-    case OPT_PRINT_MATCHES: args->print_matches = true; break;
-    case OPT_INCLUDE_TYPES: options->include_types = true; break;
-    case OPT_DEX_ALL_VERSIONS: options->dex_all_versions = true; break;
-    case OPT_OUTPUT_DIR: options->output_dir = value; break;
-    case OPT_PRINT_FILTER: args->print_filter = value; break;
-    case OPT_RULES_DIR: options->rules_dir = value; break;
-    case OPT_TYPING:
-        if (strcmp(value, "magic") == 0) {
-            options->typing = CX_TYPING_MAGIC;
-        } else if (strcmp(value, "filename") == 0) {
-            options->typing = CX_TYPING_FILENAME;
-        } else if (strcmp(value, "none") == 0) {
-            options->typing = CX_TYPING_NONE;
-        } else {
-            cx_buf_put_argument(&message, def);
-            cx_buf_puts(&message, "invalid choice: ");
-            cx_buf_put_repr(&message, value);
-            cx_buf_puts(&message, " (choose from magic, filename, none)");
-            return cx_usage_error(&message);
+        /* argparse runs these actions as soon as they are parsed: arguments
+           after them are not looked at. */
+        case OPT_HELP: args->help = true; return -1;
+        case OPT_VERSION: args->version = true; return -1;
+        case OPT_VERBOSE: options->verbose = true; break;
+        case OPT_RECURSIVE: options->recursive = true; break;
+        case OPT_SCAN_TRACKERS: options->include_trackers = true; break;
+        case OPT_JSON: options->json = true; break;
+        case OPT_PRINT_MATCHES: args->print_matches = true; break;
+        case OPT_INCLUDE_TYPES: options->include_types = true; break;
+        case OPT_DEX_ALL_VERSIONS: options->dex_all_versions = true; break;
+        case OPT_OUTPUT_DIR: options->output_dir = value; break;
+        case OPT_PRINT_FILTER: args->print_filter = value; break;
+        case OPT_RULES_DIR: options->rules_dir = value; break;
+        case OPT_TYPING:
+            if (strcmp(value, "magic") == 0) {
+                options->typing = CX_TYPING_MAGIC;
+            } else if (strcmp(value, "filename") == 0) {
+                options->typing = CX_TYPING_FILENAME;
+            } else if (strcmp(value, "none") == 0) {
+                options->typing = CX_TYPING_NONE;
+            } else {
+                cx_buf_put_argument(&message, def);
+                cx_buf_puts(&message, "invalid choice: ");
+                cx_buf_put_repr(&message, value);
+                cx_buf_puts(&message, " (choose from magic, filename, none)");
+                return cx_usage_error(&message);
+            }
+            break;
+        case OPT_TIMEOUT:
+        case OPT_SCAN_DEPTH:
+        case OPT_ENTRY_MAX_SCAN_SIZE:
+        case OPT_THREADS: {
+            int64_t number;
+            if (!cx_parse_int(value, &number)) {
+                cx_buf_put_argument(&message, def);
+                cx_buf_puts(&message, "invalid int value: ");
+                cx_buf_put_repr(&message, value);
+                return cx_usage_error(&message);
+            }
+            if (def->id == OPT_TIMEOUT) options->timeout = number;
+            else if (def->id == OPT_SCAN_DEPTH) options->scan_depth = number;
+            else if (def->id == OPT_THREADS) options->threads = number;
+            else options->entry_max_scan_size = number;
+            break;
         }
-        break;
-    case OPT_TIMEOUT:
-    case OPT_SCAN_DEPTH:
-    case OPT_ENTRY_MAX_SCAN_SIZE:
-    case OPT_THREADS: {
-        int64_t number;
-        if (!cx_parse_int(value, &number)) {
-            cx_buf_put_argument(&message, def);
-            cx_buf_puts(&message, "invalid int value: ");
-            cx_buf_put_repr(&message, value);
-            return cx_usage_error(&message);
-        }
-        if (def->id == OPT_TIMEOUT)
-            options->timeout = number;
-        else if (def->id == OPT_SCAN_DEPTH)
-            options->scan_depth = number;
-        else if (def->id == OPT_THREADS)
-            options->threads = number;
-        else
-            options->entry_max_scan_size = number;
-        break;
-    }
     }
     return 0;
 }
@@ -488,7 +466,7 @@ typedef struct cx_option_tuple {
     const cx_option_def *def; /* NULL: looks like an option, but is none */
     const char *name;         /* the option string it stands for */
     cx_separator separator;
-    const char *value;        /* the explicit argument; NULL when absent */
+    const char *value; /* the explicit argument; NULL when absent */
 } cx_option_tuple;
 
 /* ArgumentParser._parse_optional() with _get_option_tuples(): false when
@@ -558,7 +536,7 @@ static bool cx_parse_optional(const char *arg, cx_option_tuple *tuples, size_t *
 /* ArgumentParser._parse_known_args() for one positional with nargs='*'. */
 typedef struct cx_parser {
     cx_args *args;
-    char **strings;       /* the arguments after the program name */
+    char **strings; /* the arguments after the program name */
     size_t count;
     char *pattern;        /* per argument: 'O' option, 'A' argument, '-' the "--" */
     bool positional_open; /* FILE has not taken its arguments yet */
@@ -801,31 +779,25 @@ static void cx_dump_args(const cx_args *args)
         if (i) cx_buf_puts(&out, ", ");
         cx_json_string(&out, args->inputs[i]);
     }
-    cx_buf_printf(&out, "], \"verbose\": %s, \"timeout\": %lld, \"recursive\": %s, \"scan_depth\": %lld",
-                  options->verbose ? "true" : "false", (long long)options->timeout,
-                  options->recursive ? "true" : "false", (long long)options->scan_depth);
-    cx_buf_printf(&out, ", \"entry_max_scan_size\": %lld, \"typing\": \"%s\", \"scan_trackers\": %s, \"json\": %s",
-                  (long long)options->entry_max_scan_size,
-                  options->typing == CX_TYPING_MAGIC ? "magic" : options->typing == CX_TYPING_FILENAME ? "filename" : "none",
+    cx_buf_printf(&out, "], \"verbose\": %s, \"timeout\": %lld, \"recursive\": %s, \"scan_depth\": %lld", options->verbose ? "true" : "false",
+                  (long long)options->timeout, options->recursive ? "true" : "false", (long long)options->scan_depth);
+    cx_buf_printf(&out, ", \"entry_max_scan_size\": %lld, \"typing\": \"%s\", \"scan_trackers\": %s, \"json\": %s", (long long)options->entry_max_scan_size,
+                  options->typing == CX_TYPING_MAGIC      ? "magic"
+                  : options->typing == CX_TYPING_FILENAME ? "filename"
+                                                          : "none",
                   options->include_trackers ? "true" : "false", options->json ? "true" : "false");
     cx_buf_puts(&out, ", \"output_dir\": ");
-    if (options->output_dir)
-        cx_json_string(&out, options->output_dir);
-    else
-        cx_buf_puts(&out, "null");
+    if (options->output_dir) cx_json_string(&out, options->output_dir);
+    else cx_buf_puts(&out, "null");
     cx_buf_printf(&out, ", \"print_matches\": %s, \"print_filter\": ", args->print_matches ? "true" : "false");
     cx_json_string(&out, args->print_filter ? args->print_filter : "");
-    cx_buf_printf(&out, ", \"include_types\": %s, \"filter_active\": %s", options->include_types ? "true" : "false",
-                  options->print_matches ? "true" : "false");
+    cx_buf_printf(&out, ", \"include_types\": %s, \"filter_active\": %s", options->include_types ? "true" : "false", options->print_matches ? "true" : "false");
     cx_dump_names(&out, "filter_include", &options->print_include);
     cx_dump_names(&out, "filter_exclude", &options->print_exclude);
     cx_buf_puts(&out, ", \"rules_dir\": ");
-    if (options->rules_dir)
-        cx_json_string(&out, options->rules_dir);
-    else
-        cx_buf_puts(&out, "null");
-    cx_buf_printf(&out, ", \"threads\": %lld, \"dex_all_versions\": %s}\n", (long long)options->threads,
-                  options->dex_all_versions ? "true" : "false");
+    if (options->rules_dir) cx_json_string(&out, options->rules_dir);
+    else cx_buf_puts(&out, "null");
+    cx_buf_printf(&out, ", \"threads\": %lld, \"dex_all_versions\": %s}\n", (long long)options->threads, options->dex_all_versions ? "true" : "false");
     fputs(out.data, stdout);
     cx_buf_free(&out);
 }
@@ -840,8 +812,7 @@ static int cx_scan(const cx_args *args)
     int result = 0;
 
     if (!args->options.json && !args->options.output_dir)
-        printf("[+] CXAPKiD %s :: APKiD %s port :: " CXAPKID_COPYRIGHT " :: rules from RedNaga :: rednaga.io\n",
-               CXAPKID_VERSION, CXAPKID_APKID_VERSION);
+        printf("[+] CXAPKiD %s :: APKiD %s port :: " CXAPKID_COPYRIGHT " :: rules from RedNaga :: rednaga.io\n", CXAPKID_VERSION, CXAPKID_APKID_VERSION);
     fflush(stdout);
 
     if (!cx_rules_load(&rules, args->options.rules_dir, args->options.include_trackers, &error)) {
@@ -916,10 +887,8 @@ static wchar_t **cx_split_command_line(const wchar_t *line, int *count)
 
     argv[argc++] = out;
     for (; *p && (in_quotes || (*p != L' ' && *p != L'\t')); ++p) {
-        if (*p == L'"')
-            in_quotes = !in_quotes;
-        else
-            out[used++] = *p;
+        if (*p == L'"') in_quotes = !in_quotes;
+        else out[used++] = *p;
     }
     out[used++] = L'\0';
     if (*p) ++p;
